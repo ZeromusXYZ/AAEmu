@@ -143,9 +143,12 @@ namespace AAEmu.Game.Core.Managers.World
                             var phaseTime = reader.GetDateTime("phase_time");
                             var ownerId = reader.GetUInt32("owner_id");
                             var ownerType = reader.GetByte("owner_type");
+                            var itemId = reader.GetUInt64("item_id");
+                            var houseDbId = reader.GetUInt16("house_db_id");
 
                             var doodad = new Doodad
                             {
+                                IsPersistent = true,
                                 DbId = dbId,
                                 ObjId = ObjectIdManager.Instance.GetNextId(),
                                 TemplateId = templateId,
@@ -158,7 +161,9 @@ namespace AAEmu.Game.Core.Managers.World
                                 Position = new Point(x, y, z)
                                 {
                                     RotationZ = reader.GetSByte("rotation_z"), WorldId = 1
-                                }
+                                },
+                                ItemId = itemId,
+                                DbHouseId = houseDbId
                             };
                             
                             doodad.DoPhase(null, 0);

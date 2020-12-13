@@ -49,6 +49,7 @@ namespace AAEmu.Game.Models.Game.DoodadObj
         
         public uint CurrentPhaseId { get; set; }
         public uint OverridePhase { get; set; }
+        public bool IsPersistent { get; set; }
         private bool _deleted = false;
 
         public Doodad()
@@ -57,6 +58,7 @@ namespace AAEmu.Game.Models.Game.DoodadObj
             Position = new Point();
             PlantTime = DateTime.MinValue;
             AttachPoint = 255;
+            IsPersistent = false ;
         }
 
         public void SetScale(float scale)
@@ -298,14 +300,19 @@ namespace AAEmu.Game.Models.Game.DoodadObj
 
         public void Save()
         {
+            if (!IsPersistent)
+                return;
             DbId = DbId > 0 ? DbId : DoodadIdManager.Instance.GetNextId();
             using (var connection = MySQL.CreateConnection())
             {
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText = 
-                        "REPLACE INTO doodads (id, owner_id, owner_type, template_id, current_phase_id, plant_time, growth_time, phase_time, x, y, z, rotation_x, rotation_y, rotation_z) " +
-                        "VALUES(@id, @owner_id, @owner_type, @template_id, @current_phase_id, @plant_time, @growth_time, @phase_time, @x, @y, @z, @rotation_x, @rotation_y, @rotation_z)";
+                        "REPLACE INTO doodads (" +
+                        "id, owner_id, owner_type, template_id, current_phase_id, plant_time, growth_time, phase_time, x, y, z, rotation_x, rotation_y, rotation_z, item_id, house_db_id" +
+                        ") VALUES (" + 
+                        "@id, @owner_id, @owner_type, @template_id, @current_phase_id, @plant_time, @growth_time, @phase_time, @x, @y, @z, @rotation_x, @rotation_y, @rotation_z, @item_id, @house_db_id"+
+                        ")";
                     command.Parameters.AddWithValue("@id", DbId);
                     command.Parameters.AddWithValue("@owner_id", OwnerId);
                     command.Parameters.AddWithValue("@owner_type", OwnerType);
@@ -320,6 +327,8 @@ namespace AAEmu.Game.Models.Game.DoodadObj
                     command.Parameters.AddWithValue("@rotation_x", Position.RotationX);
                     command.Parameters.AddWithValue("@rotation_y", Position.RotationY);
                     command.Parameters.AddWithValue("@rotation_z", Position.RotationZ);
+                    command.Parameters.AddWithValue("@item_id", ItemId);
+                    command.Parameters.AddWithValue("@house_db_id", DbHouseId);
                     command.Prepare();
                     command.ExecuteNonQuery();
                 }

@@ -2301,6 +2301,7 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
             
             // Create doodad
             var doodad = Instance.Create(0, id, character);
+            doodad.IsPersistent = true; // setting persistent to true so things get saved 
             doodad.Position = character.Position.Clone();
             doodad.Position.X = x;
             doodad.Position.Y = y;

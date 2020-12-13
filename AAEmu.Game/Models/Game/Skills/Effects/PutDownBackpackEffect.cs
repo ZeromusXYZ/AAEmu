@@ -46,6 +46,8 @@ namespace AAEmu.Game.Models.Game.Skills.Effects
                 doodadSpawner.UnitId = BackpackDoodadId;
                 doodadSpawner.Position = pos;
                 var doodad = doodadSpawner.Spawn(0,item.Id,character.ObjId);
+                doodad.IsPersistent = true;
+                doodad.Save();
             }
         }
     }
