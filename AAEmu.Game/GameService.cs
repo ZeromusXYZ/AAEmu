@@ -39,6 +39,7 @@ namespace AAEmu.Game
             TradeIdManager.Instance.Initialize();
 
             ItemIdManager.Instance.Initialize();
+            DoodadIdManager.Instance.Initialize();
             ChatManager.Instance.Initialize();
             CharacterIdManager.Instance.Initialize();
             FamilyIdManager.Instance.Initialize();
@@ -113,6 +114,8 @@ namespace AAEmu.Game
             SpecialtyManager.Instance.Initialize();
             BoatPhysicsManager.Instance.Initialize();
             SlaveManager.Instance.Initialize();
+            CashShopManager.Instance.Initialize();
+            AIManager.Instance.Initialize();
             GameDataManager.Instance.PostLoadGameData();
             stopWatch.Stop();
             _log.Info("Server started! Took {0}", stopWatch.Elapsed);

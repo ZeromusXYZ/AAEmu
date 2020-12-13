@@ -52,7 +52,7 @@ namespace AAEmu.Game.Core.Managers
             return _activeSlaves.Where(s => kinds.Contains(s.Value.Template.SlaveKind)).Select(s => s.Value);
         }
 
-        private Slave GetActiveSlaveByObjId(uint objId)
+        public Slave GetActiveSlaveByObjId(uint objId)
         {
             foreach (var slave in _activeSlaves.Values)
             {
@@ -72,12 +72,11 @@ namespace AAEmu.Game.Core.Managers
             return null;
         }
 
-        public void UnbindSlave(GameConnection connection, uint tlId)
+        public void UnbindSlave(Character character, uint tlId)
         {
             // TODO
-            var unit = connection.ActiveChar;
             var slave = _tlSlaves[tlId];
-            unit.BroadcastPacket(new SCUnitDetachedPacket(unit.ObjId, 5), true);
+            character.BroadcastPacket(new SCUnitDetachedPacket(character.ObjId, 5), true);
             slave.Bounded = null;
         }
         
@@ -93,7 +92,9 @@ namespace AAEmu.Game.Core.Managers
         {
             var unit = connection.ActiveChar;
             var slave = _tlSlaves[tlId];
-            
+            if (slave.Bounded != null)
+                return;
+                
             unit.BroadcastPacket(new SCUnitAttachedPacket(unit.ObjId, 1, 6, slave.ObjId), true);
             unit.BroadcastPacket(new SCTargetChangedPacket(unit.ObjId, slave.ObjId), true);
             unit.CurrentTarget = slave;
@@ -106,6 +107,9 @@ namespace AAEmu.Game.Core.Managers
         {
             var activeSlaveInfo = GetActiveSlaveByObjId(objId);
             if (activeSlaveInfo == null) return;
+            
+            if (activeSlaveInfo.Bounded != null)
+                UnbindSlave(activeSlaveInfo.Bounded, activeSlaveInfo.TlId);
 
             foreach (var doodad in activeSlaveInfo.AttachedDoodads)
             {
@@ -149,10 +153,15 @@ namespace AAEmu.Game.Core.Managers
             var objId = ObjectIdManager.Instance.GetNextId();
 
             var spawnPos = owner.Position.Clone();
-            spawnPos.X += slaveTemplate.SpawnXOffset;
-            spawnPos.Y += slaveTemplate.SpawnYOffset;
+            var (x1, y1) = MathUtil.AddDistanceToFront(slaveTemplate.SpawnXOffset, spawnPos.X, spawnPos.Y, owner.Position.RotationZ);
+            var (x2, y2) = MathUtil.AddDistanceToRight(0, x1, y1, owner.Position.RotationZ);
+            spawnPos.X = x2;
+            spawnPos.Y = y2;
             if (slaveTemplate.SlaveKind == SlaveKind.Boat)
                 spawnPos.Z = 100.0f;
+
+            var degZ = MathUtil.ConvertDirectionToDegree(spawnPos.RotationZ);
+            spawnPos.RotationZ = MathUtil.ConvertDegreeToDirection(degZ + 90);
 
             // TODO
             owner.BroadcastPacket(new SCSlaveCreatedPacket(owner.ObjId, tlId, objId, false, 0, owner.Name), true);
@@ -200,13 +209,13 @@ namespace AAEmu.Game.Core.Managers
                 doodad.SetScale(doodadBinding.Scale);
 
                 doodad.CurrentPhaseId = doodad.GetFuncGroupId();
+                doodad.Position = template.Position.Clone();
 
                 if (_attachPoints.ContainsKey(template.ModelId))
                 {
                     if (_attachPoints[template.ModelId].ContainsKey(doodadBinding.AttachPointId))
                     {
                         doodad.AttachPosition = _attachPoints[template.ModelId][doodadBinding.AttachPointId];
-                        doodad.Position = template.Position.Clone();
                     }
                     else
                     {
@@ -215,7 +224,7 @@ namespace AAEmu.Game.Core.Managers
                 }
                 else
                 {
-                    doodad.Position = new Point(0f, 3.204f, 12588.96f, 0, 0, 0);
+                    doodad.AttachPosition = new Point(0f, 3.204f, 12588.96f, 0, 0, 0);
                     _log.Warn("Model id: {0} has no attach point information");
                 }
 
