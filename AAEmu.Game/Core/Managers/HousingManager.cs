@@ -1102,32 +1102,72 @@ namespace AAEmu.Game.Core.Managers
             doodadPos.X = house.Position.X + pos.X;
             doodadPos.Y = house.Position.Y + pos.Y;
             doodadPos.Z = house.Position.Z + pos.Z;
- 
 
-            
-            /*
-            var rots = MathUtil.GetYawPitchRollFromQuat(quat);
-            doodadPos.RotationX = MathUtil.ConvertDegreeToDoodadDirection(rots.Item1 / (Math.PI * 2) * -360f);
-            doodadPos.RotationY = MathUtil.ConvertDegreeToDoodadDirection(rots.Item2 / (Math.PI * 2) * -360f);
-            doodadPos.RotationZ = MathUtil.ConvertDegreeToDoodadDirection(rots.Item3 / (Math.PI * 2) * -360f);
-            */
-
+            // 0.000030518509f
             // This is mostly correct unless you near south facing
-            var rots2 = MathUtil.GetSlaveRotationFromQuat(quat);
-            doodadPos.RotationX = Helpers.ConvertRotation(rots2.Item1);
-            doodadPos.RotationY = Helpers.ConvertRotation(rots2.Item3);
-            doodadPos.RotationZ = Helpers.ConvertRotation(rots2.Item2);
+            // Works for inaccurate
+            var rots = MathUtil.GetSlaveRotationFromQuat(quat);
+            doodadPos.RotationX = Helpers.ConvertRotation(rots.Item1);
+            doodadPos.RotationY = Helpers.ConvertRotation(rots.Item3);
+            doodadPos.RotationZ = Helpers.ConvertRotation(rots.Item2);
             
+            // This mess works better weirdly enough, but still not precise enough
+            var bx = (int)Math.Round(quat.X / 0.0078740157f);
+            var by = (int)Math.Round(quat.Y / 0.0078740157f);
+            var bz = (int)Math.Round(quat.Z / 0.0078740157f);
+            if (quat.W < 0)
+            {
+                bx *= -1;
+                by *= -1;
+                bz *= -1;
+            }
+            bx += house.Position.RotationX;
+            by += house.Position.RotationY;
+            bz += house.Position.RotationZ;
+            bx = unchecked((sbyte)(bx & 0xFF));
+            by = unchecked((sbyte)(by & 0xFF));
+            bz = unchecked((sbyte)(bz & 0xFF));
+            doodadPos.RotationX = (sbyte)bx;
+            doodadPos.RotationY = (sbyte)by;
+            doodadPos.RotationZ = (sbyte)bz;
+
+            player.SendMessage("House {0} at {1},{2},{3} r={4},{5},{6}", house.Name, house.Position.X, house.Position.Y, house.Position.Z, house.Position.RotationX, house.Position.RotationY, house.Position.RotationZ);
+            player.SendMessage("Placing decor at {0}, Rot(quat) {1}", pos.ToString(), quat.ToString());
+            player.SendMessage("Rot = x{0} y{1} z{2}", bx, by, bz);
+            
+            
+            var doodad = DoodadManager.Instance.Create(objId, decorationDesign.DoodadId, player);
+            if (doodad == null)
+            {
+                _log.Warn("Doodad {0}, from decoration does not exist in db", decorationDesign.DoodadId);
+                return false;
+            }
+            doodad.DbHouseId = house.Id;
+            doodad.OwnerId = player.Id;
+            doodad.OwnerObjId = player.ObjId;
+            doodad.OwnerType = DoodadOwnerType.Character; // DoodadOwnerType.Housing;
+            doodad.Spawner = null ;
+            doodad.Position = doodadPos;
+            doodad.QuestGlow = 0u;
+            doodad.ItemId = itemId;
+            doodad.SetScale(1f);
+            doodad.Data = 0;
+            doodad.IsPersistent = true;
+            doodad.Spawn();            
+            doodad.Save();
+
+            /*
             var doodadSpawner = new DoodadSpawner();
             doodadSpawner.Id = 0;
             doodadSpawner.UnitId = decorationDesign.DoodadId ;
             doodadSpawner.Position = doodadPos;
-            var doodad = doodadSpawner.Spawn(0,item.Id,player.ObjId);
+            var doodad2 = doodadSpawner.Spawn(0,item.Id,player.ObjId);
             doodad.IsPersistent = true;
             doodad.DbHouseId = house.Id;
             doodad.OwnerId = player.Id;
             doodad.OwnerType = DoodadOwnerType.Housing;
-            doodad.Save();            
+            doodad.Save();
+            */            
            
             return true;
         }
