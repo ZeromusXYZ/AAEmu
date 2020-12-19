@@ -27,7 +27,7 @@ namespace AAEmu.Game.Core.Packets.C2G
             var quatZ = stream.ReadSingle();
             var quatW = stream.ReadSingle();
             
-            var objId = stream.ReadBc();
+            var objId = stream.ReadBc(); // parent object Id that this one is placed on ?
             var itemId = stream.ReadUInt64();
 
             // X, Y, Z are all relative to the house

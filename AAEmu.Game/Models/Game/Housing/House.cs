@@ -44,6 +44,9 @@ namespace AAEmu.Game.Models.Game.Housing
         private int _numAction;
         private DateTime _placeDate;
         private DateTime _protectionEndDate;
+        private uint _sellToPlayerId;
+        private uint _sellPrice;
+        private bool _allowRecover;
 
         /// <summary>
         /// IsDirty flag for Houses, not all properties are taken into account here as most of the data that needs to be updated will never change
@@ -113,15 +116,17 @@ namespace AAEmu.Game.Models.Game.Housing
         public DateTime PlaceDate { get => _placeDate; set { _placeDate = value; _isDirty = true; } }
         public DateTime ProtectionEndDate { get => _protectionEndDate; set { _protectionEndDate = value; _isDirty = true; } }
         public DateTime TaxDueDate { get => _protectionEndDate.AddDays(-7); }
-        public uint SellToPlayerId { get; set; }
-        public uint SellPrice { get; set; }
 
+        public uint SellToPlayerId { get => _sellToPlayerId; set { _sellToPlayerId = value; _isDirty = true; } }
+        public uint SellPrice { get => _sellPrice; set { _sellPrice = value; _isDirty = true; } }
+        public bool AllowRecover { get => _allowRecover; set { _allowRecover = value; _isDirty = true; } }
 
         public House()
         {
             Level = 1;
             ModelParams = new UnitCustomModelParams();
             AttachedDoodads = new List<Doodad>();
+            AllowRecover = true;
             IsDirty = true;
             Events.OnDeath += OnDeath ;
         }
@@ -299,7 +304,7 @@ namespace AAEmu.Game.Models.Game.Housing
             stream.Write(Helpers.ConvertLongY(Position.Y));
             stream.Write(Position.Z);
             stream.Write(Name); // house // TODO max length 128
-            stream.Write(true); // allowRecover
+            stream.Write(AllowRecover); // allowRecover
             stream.Write(SellPrice); // Sale moneyAmount
             stream.Write(SellToPlayerId); // type(id)
             stream.Write(sellToPlayerName??""); // sellToName

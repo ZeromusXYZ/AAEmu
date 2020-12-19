@@ -1097,20 +1097,13 @@ namespace AAEmu.Game.Core.Managers
             // Create decoration doodad
 
             var decorationDesign = GetDecorationDesignFromId(designId);
-            
-            var doodadPos = player.Position.Clone();
-            doodadPos.X = house.Position.X + pos.X;
-            doodadPos.Y = house.Position.Y + pos.Y;
-            doodadPos.Z = house.Position.Z + pos.Z;
 
-            // 0.000030518509f
-            // This is mostly correct unless you near south facing
-            // Works for inaccurate
-            var rots = MathUtil.GetSlaveRotationFromQuat(quat);
-            doodadPos.RotationX = Helpers.ConvertRotation(rots.Item1);
-            doodadPos.RotationY = Helpers.ConvertRotation(rots.Item3);
-            doodadPos.RotationZ = Helpers.ConvertRotation(rots.Item2);
-            
+            // Attaching Position
+            var attachPos = new Point();
+            attachPos.X = pos.X;
+            attachPos.Y = pos.Y;
+            attachPos.Z = pos.Z;
+
             // This mess works better weirdly enough, but still not precise enough
             var bx = (int)Math.Round(quat.X / 0.0078740157f);
             var by = (int)Math.Round(quat.Y / 0.0078740157f);
@@ -1121,9 +1114,41 @@ namespace AAEmu.Game.Core.Managers
                 by *= -1;
                 bz *= -1;
             }
+            bx = unchecked((sbyte)(bx & 0xFF));
+            by = unchecked((sbyte)(by & 0xFF));
+            bz = unchecked((sbyte)(bz & 0xFF));
+            attachPos.RotationX = (sbyte)bx;
+            attachPos.RotationY = (sbyte)by;
+            attachPos.RotationZ = (sbyte)bz;
+            
+            // Doodad Position
+            var doodadPos = player.Position.Clone();
+            doodadPos.X = pos.X + house.Position.X;
+            doodadPos.Y = pos.Y + house.Position.Y;
+            doodadPos.Z = pos.Z + house.Position.Z;
+            
+            // 0.000030518509f
+            // This is mostly correct unless you near south facing
+            // Works for inaccurate
+            /*
+            var rots = MathUtil.GetSlaveRotationFromQuat(quat);
+            doodadPos.RotationX = Helpers.ConvertRotation(rots.Item1);
+            doodadPos.RotationY = Helpers.ConvertRotation(rots.Item3);
+            doodadPos.RotationZ = Helpers.ConvertRotation(rots.Item2);
+            */
+            bx = (int)Math.Round(quat.X / 0.0078740157f);
+            by = (int)Math.Round(quat.Y / 0.0078740157f);
+            bz = (int)Math.Round(quat.Z / 0.0078740157f);
+            if (quat.W < 0)
+            {
+                bx *= -1;
+                by *= -1;
+                bz *= -1;
+            }            
             bx += house.Position.RotationX;
             by += house.Position.RotationY;
             bz += house.Position.RotationZ;
+            
             bx = unchecked((sbyte)(bx & 0xFF));
             by = unchecked((sbyte)(by & 0xFF));
             bz = unchecked((sbyte)(bz & 0xFF));
@@ -1132,11 +1157,11 @@ namespace AAEmu.Game.Core.Managers
             doodadPos.RotationZ = (sbyte)bz;
 
             player.SendMessage("House {0} at {1},{2},{3} r={4},{5},{6}", house.Name, house.Position.X, house.Position.Y, house.Position.Z, house.Position.RotationX, house.Position.RotationY, house.Position.RotationZ);
-            player.SendMessage("Placing decor at {0}, Rot(quat) {1}", pos.ToString(), quat.ToString());
+            player.SendMessage("Placing decor at {0} with Rot(quat) {1}", pos.ToString(), quat.ToString());
             player.SendMessage("Rot = x{0} y{1} z{2}", bx, by, bz);
             
             
-            var doodad = DoodadManager.Instance.Create(objId, decorationDesign.DoodadId, player);
+            var doodad = DoodadManager.Instance.Create(0, decorationDesign.DoodadId, player);
             if (doodad == null)
             {
                 _log.Warn("Doodad {0}, from decoration does not exist in db", decorationDesign.DoodadId);
@@ -1145,16 +1170,24 @@ namespace AAEmu.Game.Core.Managers
             doodad.DbHouseId = house.Id;
             doodad.OwnerId = player.Id;
             doodad.OwnerObjId = player.ObjId;
-            doodad.OwnerType = DoodadOwnerType.Character; // DoodadOwnerType.Housing;
+            doodad.ParentObj = house;
+            doodad.ParentObjId = doodad.ParentObj.ObjId ; // this needs to be set, but messes up spawns
+            doodad.OwnerType = DoodadOwnerType.Housing; // DoodadOwnerType.Housing;
             doodad.Spawner = null ;
-            doodad.Position = doodadPos;
+            doodad.Position = doodadPos.Clone();
+            doodad.AttachPoint = 0;
+            doodad.AttachPosition = attachPos.Clone();
+            doodad.WorldPosition = doodadPos.Clone();
             doodad.QuestGlow = 0u;
-            doodad.ItemId = itemId;
+            doodad.ItemId = item.Template.MaxCount > 1 ? itemId : 0 ;
             doodad.SetScale(1f);
             doodad.Data = 0;
-            doodad.IsPersistent = true;
+            doodad.PlantTime = DateTime.Now;
+            doodad.IsPersistent = false;
             doodad.Spawn();            
             doodad.Save();
+
+            player.SendMessage("Doodad spawned at x{0} y{1} z{2} with rotation x{3} y{4} z{5} ", doodad.Position.X,doodad.Position.Y,doodad.Position.Z, doodad.Position.RotationX, doodad.Position.RotationY, doodad.Position.RotationZ);
 
             /*
             var doodadSpawner = new DoodadSpawner();
@@ -1170,6 +1203,17 @@ namespace AAEmu.Game.Core.Managers
             */            
            
             return true;
+        }
+
+        public void HousingToggleAllowRecover(Character character, ushort houseTl)
+        {
+            var house = GetHouseByTlId(houseTl);
+            if (house == null)
+                return;
+            if (character.Id != house.OwnerId)
+                return;
+            house.AllowRecover = !house.AllowRecover;
+            house.BroadcastPacket(new SCHousingRecoverTogglePacket(house.TlId,house.AllowRecover), false);
         }
 
     }
