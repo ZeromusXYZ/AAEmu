@@ -77,7 +77,6 @@ namespace AAEmu.Game.Models.Game.Char
         public bool IsInPostCast { get; set; }
         public bool IgnoreSkillCooldowns { get; set; }
         public string FactionName { get; set; }
-        public uint Family { get; set; }
         public short DeadCount { get; set; }
         public DateTime DeadTime { get; set; }
         public int RezWaitDuration { get; set; }

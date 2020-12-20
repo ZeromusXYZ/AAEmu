@@ -4,6 +4,7 @@ using AAEmu.Commons.Utils;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Core.Network.Game;
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Models.Game.Chat;
 using AAEmu.Game.Models.Game.Expeditions;
@@ -304,7 +305,6 @@ namespace AAEmu.Game.Core.Managers
             return _guildChannels.TryAdd(guild.Id, channel);
         }
 
-
         public ChatChannel GetGuildChat(Expedition guild)
         {
             // create it if it's not there
@@ -325,6 +325,32 @@ namespace AAEmu.Game.Core.Managers
             }
         }
 
+        private bool AddFamilyChannel(Family family)
+        {
+            var channel = new ChatChannel() { chatType = ChatType.Family, subType = (short)family.Id, internalId = family.Id, internalName = family.Id.ToString() };
+            return _familyChannels.TryAdd(family.Id, channel);
+        }
+        
+        public ChatChannel GetFamilyChat(Family family)
+        {
+            // create it if it's not there
+            if (!_familyChannels.ContainsKey(family.Id))
+            {
+                if (!AddFamilyChannel(family))
+                    _log.Error("Failed to create family chat channel !");
+            }
+
+            if (_familyChannels.TryGetValue(family.Id, out var channel))
+            {
+                return channel;
+            }
+            else
+            {
+                _log.Error("Should not be able to get a null channel from GetFamilyChat !");
+                return nullChannel;
+            }
+        }
+        
         private bool AddPartyChannel(uint partyId)
         {
             var channel = new ChatChannel() { chatType = ChatType.Party, subType = (short)partyId, internalId = partyId, internalName = "Party(" + partyId.ToString() + ")" };

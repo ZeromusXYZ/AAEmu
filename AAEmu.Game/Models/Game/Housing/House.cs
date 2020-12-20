@@ -36,7 +36,7 @@ namespace AAEmu.Game.Models.Game.Housing
         private int _allAction;
         private uint _id;
         private uint _accountId;
-        private uint _coOwnerId;
+        private uint _originalOwnerId;
         private uint _templateId;
         private int _baseAction;
         private bool _isDirty;
@@ -55,7 +55,7 @@ namespace AAEmu.Game.Models.Game.Housing
         public bool IsDirty { get => _isDirty; set => _isDirty = value; }
         public uint Id { get => _id; set { _id = value; _isDirty = true; } }
         public uint AccountId { get => _accountId; set { _accountId = value; _isDirty = true; } }
-        public uint CoOwnerId { get => _coOwnerId; set { _coOwnerId = value; _isDirty = true; } }
+        public uint OriginalOwnerId { get => _originalOwnerId; set { _originalOwnerId = value; _isDirty = true; } }
         //public ushort TlId { get; set; }
         public uint TemplateId { get => _templateId; set { _templateId = value; _isDirty = true; } }
         public HousingTemplate Template
@@ -249,7 +249,7 @@ namespace AAEmu.Game.Models.Game.Housing
                 command.Parameters.AddWithValue("@id", Id);
                 command.Parameters.AddWithValue("@account_id", AccountId);
                 command.Parameters.AddWithValue("@owner", OwnerId);
-                command.Parameters.AddWithValue("@co_owner", CoOwnerId);
+                command.Parameters.AddWithValue("@co_owner", OriginalOwnerId);
                 command.Parameters.AddWithValue("@template_id", TemplateId);
                 command.Parameters.AddWithValue("@name", Name);
                 command.Parameters.AddWithValue("@x", Position.X);
@@ -281,7 +281,7 @@ namespace AAEmu.Game.Models.Game.Housing
             stream.WriteBc(ObjId);
             stream.Write(TemplateId);
             stream.WritePisc(ModelId, 0); //stream.Write(ModelId); // ht
-            stream.Write(CoOwnerId); // type(id)
+            stream.Write(OriginalOwnerId); // type(id)
             stream.Write(OwnerId); // type(id)
             stream.Write(ownerName ?? "");
             stream.Write(AccountId);

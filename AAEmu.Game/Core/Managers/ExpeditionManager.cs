@@ -236,13 +236,13 @@ namespace AAEmu.Game.Core.Managers
                 }
                 validMembers.Add(m);
             }
-
+/*
             if (validMembers.Count < _config.Create.PartyMemberCount)
             {
                 connection.ActiveChar.SendErrorMessage(ErrorMessageType.ExpeditionCreateMember);
                 return;
             }
-
+*/
             if (owner.Money < _config.Create.Cost)
             {
                 connection.ActiveChar.SendErrorMessage(ErrorMessageType.ExpeditionCreateMoney);
@@ -554,6 +554,19 @@ namespace AAEmu.Game.Core.Managers
             }
 
             character.SendPacket(new SCExpeditionRolePolicyListPacket(new List<ExpeditionRolePolicy>()));
+        }
+
+        public Expedition GetExpeditionByCharacterId(uint characterId)
+        {
+            foreach (var guild in _expeditions)
+            {
+                foreach (var member in guild.Value.Members)
+                {
+                    if (member.CharacterId == characterId)
+                        return guild.Value;
+                }
+            }
+            return null;
         }
     }
 }

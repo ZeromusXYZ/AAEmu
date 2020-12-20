@@ -165,6 +165,7 @@ namespace AAEmu.Game.Models.Game.Units
         public PlotState ActivePlotState { get; set; }
         public Dictionary<uint, List<Bonus>> Bonuses { get; set; }
         public Expedition Expedition { get; set; }
+        public uint Family { get; set; }        
         public bool IsInBattle { get; set; }
         public bool IsInPatrol { get; set; } // so as not to run the route a second time
         public int SummarizeDamage { get; set; }

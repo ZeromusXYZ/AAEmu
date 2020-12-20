@@ -289,7 +289,7 @@ namespace AAEmu.Game.Core.Managers
                             house.Id = reader.GetUInt32("id");
                             house.AccountId = reader.GetUInt32("account_id");
                             house.OwnerId = reader.GetUInt32("owner");
-                            house.CoOwnerId = reader.GetUInt32("co_owner");
+                            house.OriginalOwnerId = reader.GetUInt32("co_owner");
                             house.Name = reader.GetString("name");
                             house.Position = new Point(reader.GetFloat("x"), reader.GetFloat("y"), reader.GetFloat("z"));
                             house.Position.RotationZ = reader.GetSByte("rotation_z");
@@ -302,6 +302,8 @@ namespace AAEmu.Game.Core.Managers
                             house.ProtectionEndDate = reader.GetDateTime("protected_until");
                             house.SellToPlayerId = reader.GetUInt32("sell_to");
                             house.SellPrice = reader.GetUInt32("sell_price");
+                            house.Expedition = ExpeditionManager.Instance.GetExpeditionByCharacterId(house.OwnerId);
+                            house.Family = FamilyManager.Instance.GetFamilyByCharacterId(house.OwnerId)?.Id ?? 0;
                             _houses.Add(house.Id, house);
                             _housesTl.Add(house.TlId, house);
                             
@@ -537,7 +539,6 @@ namespace AAEmu.Game.Core.Managers
             else
             {
                 // Pay in Gold
-                // TODO: test house with actual gold tax
                 if (totalTaxAmountDue > connection.ActiveChar.Money)
                 {
                     connection.ActiveChar.SendErrorMessage(ErrorMessageType.MailNotEnoughMoneyToPayTaxes);
@@ -576,7 +577,7 @@ namespace AAEmu.Game.Core.Managers
             else
                 house.CurrentStep = -1;
             house.OwnerId = connection.ActiveChar.Id;
-            house.CoOwnerId = connection.ActiveChar.Id;
+            house.OriginalOwnerId = connection.ActiveChar.Id;
             house.AccountId = connection.AccountId;
             house.Permission = HousingPermission.Private;
             house.PlaceDate = DateTime.UtcNow;
@@ -602,18 +603,18 @@ namespace AAEmu.Game.Core.Managers
                 case HousingPermission.Family when connection.ActiveChar.Family == 0:
                     return;
                 case HousingPermission.Guild:
-                    house.CoOwnerId = connection.ActiveChar.Expedition.Id;
+                    //house.OriginalOwnerId = connection.ActiveChar.Expedition.Id;
                     break;
                 case HousingPermission.Family:
-                    house.CoOwnerId = connection.ActiveChar.Family;
+                    //house.OriginalOwnerId = connection.ActiveChar.Family;
                     break;
                 default:
-                    house.CoOwnerId = connection.ActiveChar.Id;
+                    //house.OriginalOwnerId = connection.ActiveChar.Id;
                     break;
             }
 
             house.Permission = permission;
-            connection.SendPacket(new SCHousePermissionChangedPacket(tlId, (byte)permission));
+            house.BroadcastPacket(new SCHousePermissionChangedPacket(tlId, (byte)permission),false);
         }
 
         public void ChangeHouseName(GameConnection connection, ushort tlId, string name)
@@ -626,7 +627,7 @@ namespace AAEmu.Game.Core.Managers
 
             house.Name = name.Substring(0, 1).ToUpper() + name.Substring(1);
             house.IsDirty = true; // Manually set the IsDirty on House level
-            connection.SendPacket(new SCUnitNameChangedPacket(house.ObjId, house.Name));
+            house.BroadcastPacket(new SCUnitNameChangedPacket(house.ObjId, house.Name), false);
         }
 
         public void Demolish(GameConnection connection, House house, bool failedToPayTax)
@@ -658,7 +659,7 @@ namespace AAEmu.Game.Core.Managers
                 ReturnHouseItemsToOwner(house, failedToPayTax);
                 // Remove owner
                 house.OwnerId = 0;
-                house.CoOwnerId = 0;
+                house.OriginalOwnerId = 0;
                 house.AccountId = 0;
                 house.SellPrice = 0;
                 house.SellToPlayerId = 0;
@@ -1022,11 +1023,19 @@ namespace AAEmu.Game.Core.Managers
             house.SellToPlayerId = 0;
             house.AccountId = character.AccountId;
             house.OwnerId = character.Id;
-            house.CoOwnerId = character.Id;
+            //house.OriginalOwnerId = character.Id;
             house.Permission = house.Template.AlwaysPublic ? HousingPermission.Public : HousingPermission.Private;
+            
+            // Update faction
             UpdateHouseFaction(house,character.Faction.Id);
+            // Update Guild
+            house.Expedition = ExpeditionManager.Instance.GetExpeditionByCharacterId(house.OwnerId);
+            // Update Family
+            house.Family = FamilyManager.Instance.GetFamilyByCharacterId(house.OwnerId).Id;
+            // Update Tax
             UpdateTaxInfo(house); // send tax due mails etc if needed ...
             
+            // Let the people know
             house.BroadcastPacket(
                 new SCHouseSoldPacket(house.TlId, previousOwner, character.Id, character.AccountId, character.Name,
                     house.Name), false);

@@ -129,6 +129,7 @@ namespace AAEmu.Game.Core.Managers
 
             character.SendPacket(new SCFamilyDescPacket(family));
             family.SendPacket(new SCFamilyMemberOnlinePacket(family.Id, member.Id, true));
+            ChatManager.Instance.GetFamilyChat(family).JoinChannel(character);
         }
 
         /// <summary>
@@ -142,6 +143,7 @@ namespace AAEmu.Game.Core.Managers
             member.Character = null;
 
             family.SendPacket(new SCFamilyMemberOnlinePacket(family.Id, character.Id, false), character.Id);
+            ChatManager.Instance.GetFamilyChat(family).LeaveChannel(character);
         }
 
         /// <summary>
@@ -276,6 +278,19 @@ namespace AAEmu.Game.Core.Managers
             member.Role = owner;
             member.Title = title;
             return member;
+        }
+
+        public Family GetFamilyByCharacterId(uint characterId)
+        {
+            foreach (var fam in _families)
+            {
+                foreach (var member in fam.Value.Members)
+                {
+                    if (member.Id == characterId)
+                        return fam.Value;
+                }
+            }
+            return null;
         }
     }
 }

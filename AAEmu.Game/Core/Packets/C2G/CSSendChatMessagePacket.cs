@@ -107,14 +107,26 @@ namespace AAEmu.Game.Core.Packets.C2G
                         Connection.ActiveChar.SendErrorMessage(Models.Game.Error.ErrorMessageType.ChatNotInExpedition);
                     }
                     break;
-                    /*
-                case ChatType.Judge: 
-                    // TODO: Need a check so only defendant and jury can talk here, the client does some checks too, but let's make sure
-                    ChatManager.Instance.GetNationChat(Connection.ActiveChar.Race).SendPacket(
-                        new SCChatMessagePacket(type, Connection.ActiveChar, message, ability, languageType)
-                        );
+                case ChatType.Family:
+                    if (Connection.ActiveChar.Family != 0)
+                    {
+                        var fam = FamilyManager.Instance.GetFamily(Connection.ActiveChar.Family);
+                        ChatManager.Instance.GetFamilyChat(fam).SendMessage(Connection.ActiveChar, message, ability, languageType);
+                    }
+                    else
+                    {
+                        // Looks like the client blocks the chat even before it can get to the server, but let's intercept it anyway
+                        Connection.ActiveChar.SendErrorMessage(Models.Game.Error.ErrorMessageType.ChatNotInExpedition);
+                    }
                     break;
-                    */
+                /*
+            case ChatType.Judge: 
+                // TODO: Need a check so only defendant and jury can talk here, the client does some checks too, but let's make sure
+                ChatManager.Instance.GetNationChat(Connection.ActiveChar.Race).SendPacket(
+                    new SCChatMessagePacket(type, Connection.ActiveChar, message, ability, languageType)
+                    );
+                break;
+                */
                 case ChatType.Region: //nation (birth place/race, includes pirates etc)
                     ChatManager.Instance.GetNationChat(Connection.ActiveChar.Race).SendMessage(Connection.ActiveChar, message, ability, languageType);
                     break;
