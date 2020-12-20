@@ -354,7 +354,7 @@ CREATE TABLE `housings` (
   `faction_id` int(10) unsigned NOT NULL DEFAULT '1',
   `sell_to` int(10) unsigned NOT NULL DEFAULT '0',
   `sell_price` bigint(20) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`account_id`,`owner`,`id`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- ----------------------------
@@ -409,7 +409,7 @@ CREATE TABLE `mails` (
   `send_date` datetime NOT NULL,
   `received_date` datetime NOT NULL,
   `returned` int(11) NOT NULL,
-  `extra` int(11) NOT NULL,
+  `extra` bigint(20) NOT NULL,
   `money_amount_1` int(11) NOT NULL,
   `money_amount_2` int(11) NOT NULL,
   `money_amount_3` int(11) NOT NULL,

@@ -759,7 +759,7 @@ namespace AAEmu.Game.Core.Managers
             else
             if (isTaxDue)
             {
-                // TODO: update corresponding mails if needed (like update weeks unpaid etc)
+                // Update corresponding mails if needed (like update weeks unpaid etc)
                 var allMails = MailManager.Instance.GetMyHouseMails(house.Id);
 
                 if (allMails.Count <= 0)
