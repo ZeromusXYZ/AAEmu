@@ -33,7 +33,7 @@ namespace AAEmu.Game.Scripts.Commands
                 "|cFFFFFFFFtaxmail|r -> Creates a tax due mail for the house owner\n" +
                 "|cFFFFFFFFsetforsale <money> [buyer]|r -> Forces a house for sale to be set, with optional [buyer] specified. Specify 0 money to clear the sale. (does not return any certificates)\n" +
                 "|cFFFFFFFFsettaxdue|r -> Sets the house's taxdue date to now.\n" +
-                "|cFFFFFFFFsettaxduesoon|r -> Sets the house's taxdue date to 20 seconds from now.\n" +
+                "|cFFFFFFFFsettaxoverdue|r -> Sets the house's taxoverdue date to now.\n" +
                 "|cFFFFFFFFsetdemosoon|r -> Sets the house's demolition date to 20 seconds from now.\n" +
                 "";
         }
@@ -80,11 +80,11 @@ namespace AAEmu.Game.Scripts.Commands
                         character.SendMessage("[House] Created tax for selected building");
                         break;
                     case "settaxdue":
-                        house.ProtectionEndDate = DateTime.UtcNow.AddDays(7);
+                        house.ProtectionEndDate = DateTime.UtcNow.AddDays(14);
                         HousingManager.Instance.UpdateTaxInfo(house);
                         break;
-                    case "settaxduesoon":
-                        house.ProtectionEndDate = DateTime.UtcNow.AddDays(7).AddSeconds(20);
+                    case "settaxoverdue":
+                        house.ProtectionEndDate = DateTime.UtcNow.AddDays(7);
                         HousingManager.Instance.UpdateTaxInfo(house);
                         break;
                     case "setdemosoon":

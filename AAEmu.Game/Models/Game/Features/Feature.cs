@@ -6,6 +6,7 @@
         //Refer to FeatureSet.GetIndexes to interpret
         siege = 0,
         allowFamilyChanges = 1,
+        houseSales = 3,
         premium = 4,
         ranking = 36,
         ingamecashshop = 38,

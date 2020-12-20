@@ -33,6 +33,7 @@ namespace AAEmu.Game.Core.Managers
             Fsets.Set(Feature.ingameshopSecondpass, false);
             Fsets.Set(Feature.itemSecure, false);
 
+            Fsets.Set(Feature.houseSales, true);
             //Fsets.Set(Feature.taxItem, false);
 
             var featsOn = string.Empty;

@@ -453,9 +453,26 @@ namespace AAEmu.Game.Core.Managers
             var baseTax = (int)(house.Template.Taxation?.Tax ?? 0);
             var depositTax = baseTax * 2;
 
-            var weeksDelta = DateTime.UtcNow - house.ProtectionEndDate ;
-            var weeksWithoutPay = (int)Math.Ceiling(weeksDelta.TotalDays / 7f);
+            var weeksDelta = house.ProtectionEndDate - DateTime.UtcNow ;
+            var weeksWithoutPay = (int)(Math.Ceiling(weeksDelta.TotalDays / -7f) * 1f);
             var isAlreadyPaid = house.TaxDueDate > DateTime.UtcNow; // already payed if the tax-due date is past now
+
+            if (house.TaxOverDueDate <= DateTime.UtcNow)
+            {
+                weeksWithoutPay = 0;
+            }
+            else
+            if (house.TaxDueDate > DateTime.Now)
+            {
+                weeksWithoutPay = -1;
+            }
+            else
+            if (house.TaxDueDate <= DateTime.UtcNow)
+            {
+                weeksWithoutPay = 1;
+            }
+            
+            //weeksWithoutPay = 1; // 0 overdue ; >0 not paid ; <0 paid 
             _log.Debug(
                 "HouseTaxInfo; {0}({7}) - TlId: {1}, depositTax:{2}, totalTaxDue:{3}, protectEnd:{4}, isPaid:{5}, weeksWithoutPay:{6}",
                 house.Name, house.TlId, depositTax, totalTaxAmountDue, house.ProtectionEndDate, isAlreadyPaid,
@@ -466,7 +483,7 @@ namespace AAEmu.Game.Core.Managers
                     0,  // TODO: implement when castles are added
                     depositTax, // this is used in the help text on (?) when you hover your mouse over it to display deposit tax for this building
                     totalTaxAmountDue, // Amount Due
-                    house.TaxDueDate,
+                    house.ProtectionEndDate,
                     isAlreadyPaid, 
                     weeksWithoutPay,  // TODO: do proper calculation
                     house.Template.HeavyTax
@@ -581,7 +598,7 @@ namespace AAEmu.Game.Core.Managers
             house.AccountId = connection.AccountId;
             house.Permission = HousingPermission.Private;
             house.PlaceDate = DateTime.UtcNow;
-            house.ProtectionEndDate = DateTime.UtcNow.AddDays(7);
+            house.ProtectionEndDate = DateTime.UtcNow.AddDays(14);
             _houses.Add(house.Id, house);
             _housesTl.Add(house.TlId, house);
             connection.ActiveChar.SendPacket(new SCMyHousePacket(house));
