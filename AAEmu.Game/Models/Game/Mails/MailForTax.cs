@@ -56,12 +56,16 @@ namespace AAEmu.Game.Models.Game.Mails
             if (!HousingManager.Instance.CalculateBuildingTaxInfo(house.AccountId, house.Template, false, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate))
                 return false;
             
+            /*
             var weeksDelta = house.TaxDueDate - DateTime.UtcNow;
             var weeks = 0 ;
             if (weeksDelta.TotalSeconds <= 0)
             {
                 weeks = (int)Math.Ceiling(weeksDelta.TotalDays / -7f);
             }
+            */
+            var weeksDelta = DateTime.UtcNow - house.ProtectionEndDate ;
+            var weeksWithoutPay = (int)Math.Ceiling(weeksDelta.TotalDays / 7f);
 
             //testmail 6 .houseTax title(25) "body('Test','1606565186','1607169986','1606565186','250000','50','3','0','500000','true','1')" 0 500000
             mail.Body.Text = string.Format("body('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '{8}', '{9}', '{10}')",
@@ -72,13 +76,12 @@ namespace AAEmu.Game.Models.Game.Mails
                 house.Template.Taxation.Tax,                // This house base tax rate
                 hostileTaxRate,                             // dominion tax rate (castle tax rate ?)
                 heavyTaxHouseCount,                         // number of heavy tax houses
-                weeks,                                      // unpaid week count (listed as late fee)
+                weeksWithoutPay,                            // unpaid week count (listed as late fee)
                 totalTaxAmountDue,                          // amount to Pay (as gold reference)
                 house.Template.HeavyTax ? "true" : "false", // is this a heavy tax building
-                normalTaxHouseCount                         // number of tax-excempt houses
+                normalTaxHouseCount                         // number of tax-exempt houses
                 );
             // In never version this has a extra field at the end, which I assume is would be the hostile tax rate
-            // TODO: Make better use of unpaidweekcount
 
             mail.Body.BillingAmount = totalTaxAmountDue;
 

@@ -280,8 +280,7 @@ namespace AAEmu.Game.Models.Game.Housing
             stream.Write(Id); // dbId
             stream.WriteBc(ObjId);
             stream.Write(TemplateId);
-            stream.WritePisc(ModelId, 0);
-            //stream.Write(ModelId); // ht
+            stream.WritePisc(ModelId, 0); //stream.Write(ModelId); // ht
             stream.Write(CoOwnerId); // type(id)
             stream.Write(OwnerId); // type(id)
             stream.Write(ownerName ?? "");

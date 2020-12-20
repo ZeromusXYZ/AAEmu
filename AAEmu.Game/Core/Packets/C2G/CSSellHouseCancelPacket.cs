@@ -14,6 +14,8 @@ namespace AAEmu.Game.Core.Packets.C2G
             var tl = stream.ReadUInt16();
 
             _log.Debug("SellHouseCancel, Tl: {0}", tl);
+            var house = AAEmu.Game.Core.Managers.HousingManager.Instance.GetHouseByTlId(tl);
+            AAEmu.Game.Core.Managers.HousingManager.Instance.CancelForSale(house);
         }
     }
 }

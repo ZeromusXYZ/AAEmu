@@ -451,17 +451,22 @@ namespace AAEmu.Game.Core.Managers
             var baseTax = (int)(house.Template.Taxation?.Tax ?? 0);
             var depositTax = baseTax * 2;
 
-            var weeksDelta = house.ProtectionEndDate - DateTime.UtcNow;
-            var weeks = (int)(weeksDelta.TotalDays / -7f);
+            var weeksDelta = DateTime.UtcNow - house.ProtectionEndDate ;
+            var weeksWithoutPay = (int)Math.Ceiling(weeksDelta.TotalDays / 7f);
+            var isAlreadyPaid = house.TaxDueDate > DateTime.UtcNow; // already payed if the tax-due date is past now
+            _log.Debug(
+                "HouseTaxInfo; {0}({7}) - TlId: {1}, depositTax:{2}, totalTaxDue:{3}, protectEnd:{4}, isPaid:{5}, weeksWithoutPay:{6}",
+                house.Name, house.TlId, depositTax, totalTaxAmountDue, house.ProtectionEndDate, isAlreadyPaid,
+                weeksWithoutPay, house.Id);
             connection.SendPacket(
                 new SCHouseTaxInfoPacket(
                     house.TlId,
                     0,  // TODO: implement when castles are added
                     depositTax, // this is used in the help text on (?) when you hover your mouse over it to display deposit tax for this building
                     totalTaxAmountDue, // Amount Due
-                    house.ProtectionEndDate,
-                    house.TaxDueDate > DateTime.UtcNow, // already payed if the tax-due date is past now
-                    weeks,  // TODO: do proper calculation
+                    house.TaxDueDate,
+                    isAlreadyPaid, 
+                    weeksWithoutPay,  // TODO: do proper calculation
                     house.Template.HeavyTax
                 )
             );
@@ -991,7 +996,7 @@ namespace AAEmu.Game.Core.Managers
                 return false;
             }
 
-            if (house.SellToPlayerId == character.Id)
+            if (house.OwnerId == character.Id)
             {
                 // Cannot buy own building
                 character.SendErrorMessage(ErrorMessageType.HouseCannotBuyAsOwner);
@@ -1022,12 +1027,13 @@ namespace AAEmu.Game.Core.Managers
             UpdateHouseFaction(house,character.Faction.Id);
             UpdateTaxInfo(house); // send tax due mails etc if needed ...
             
-            // TODO: broadcast changes
             house.BroadcastPacket(
                 new SCHouseSoldPacket(house.TlId, previousOwner, character.Id, character.AccountId, character.Name,
                     house.Name), false);
-
+            
             house.IsDirty = true;
+
+            // TODO: update doodad/furniture owner info
 
             return true;
         }
