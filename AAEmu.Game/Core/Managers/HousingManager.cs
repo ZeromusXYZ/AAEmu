@@ -424,7 +424,7 @@ namespace AAEmu.Game.Core.Managers
 
             var houseTemplate = _housingTemplates[designId];
 
-            CalculateBuildingTaxInfo(connection.ActiveChar.AccountId, houseTemplate, true, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate);
+            CalculateBuildingTaxInfo(connection.ActiveChar.AccountId, houseTemplate, true, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate,out _);
 
             var baseTax = (int)(houseTemplate.Taxation?.Tax ?? 0);
             var depositTax = baseTax * 2;
@@ -448,35 +448,31 @@ namespace AAEmu.Game.Core.Managers
 
             var house = _housesTl[tlId];
 
-            CalculateBuildingTaxInfo(house.AccountId, house.Template, false, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate);
+            CalculateBuildingTaxInfo(house.AccountId, house.Template, false, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate,out _);
 
             var baseTax = (int)(house.Template.Taxation?.Tax ?? 0);
             var depositTax = baseTax * 2;
 
-            var weeksDelta = house.ProtectionEndDate - DateTime.UtcNow ;
-            var weeksWithoutPay = (int)(Math.Ceiling(weeksDelta.TotalDays / -7f) * 1f);
-            var isAlreadyPaid = house.TaxDueDate > DateTime.UtcNow; // already payed if the tax-due date is past now
-
+            // Note: I'm sure this can be done better, but it works and displays correctly
+            var requiresPayment = false;
+            var weeksWithoutPay = -1;
             if (house.TaxOverDueDate <= DateTime.UtcNow)
             {
+                requiresPayment = true;
                 weeksWithoutPay = 0;
             }
             else
-            if (house.TaxDueDate > DateTime.Now)
+            if (house.TaxDueDate <= DateTime.Now)
             {
-                weeksWithoutPay = -1;
-            }
-            else
-            if (house.TaxDueDate <= DateTime.UtcNow)
-            {
+                requiresPayment = true;
                 weeksWithoutPay = 1;
             }
-            
-            //weeksWithoutPay = 1; // 0 overdue ; >0 not paid ; <0 paid 
+
+            /*
             _log.Debug(
-                "HouseTaxInfo; {0}({7}) - TlId: {1}, depositTax:{2}, totalTaxDue:{3}, protectEnd:{4}, isPaid:{5}, weeksWithoutPay:{6}",
-                house.Name, house.TlId, depositTax, totalTaxAmountDue, house.ProtectionEndDate, isAlreadyPaid,
-                weeksWithoutPay, house.Id);
+                "SCHouseTaxInfoPacket; tlId:{0}, domTaxRate:{1}, deposit: {2}, taxdue:{3}, protectEnd:{4}, isPaid:{5}, weeksWithoutPay:{6}, isHeavy:{7}",
+                house.TlId, 0, depositTax, totalTaxAmountDue, house.ProtectionEndDate, requiresPayment, weeksWithoutPay, house.Template.HeavyTax);
+            */
             connection.SendPacket(
                 new SCHouseTaxInfoPacket(
                     house.TlId,
@@ -484,8 +480,8 @@ namespace AAEmu.Game.Core.Managers
                     depositTax, // this is used in the help text on (?) when you hover your mouse over it to display deposit tax for this building
                     totalTaxAmountDue, // Amount Due
                     house.ProtectionEndDate,
-                    isAlreadyPaid, 
-                    weeksWithoutPay,  // TODO: do proper calculation
+                    requiresPayment, 
+                    weeksWithoutPay,  // TODO: do proper calculation ?
                     house.Template.HeavyTax
                 )
             );
@@ -510,7 +506,7 @@ namespace AAEmu.Game.Core.Managers
             var zoneId = WorldManager.Instance.GetZoneId(1, position.X, position.Y);
 
             var houseTemplate = _housingTemplates[designId];
-            CalculateBuildingTaxInfo(connection.ActiveChar.AccountId, houseTemplate, true, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate);
+            CalculateBuildingTaxInfo(connection.ActiveChar.AccountId, houseTemplate, true, out var totalTaxAmountDue, out var heavyTaxHouseCount, out var normalTaxHouseCount, out var hostileTaxRate,out _);
 
             if (FeaturesManager.Fsets.Check(Models.Game.Features.Feature.taxItem))
             {
@@ -713,12 +709,13 @@ namespace AAEmu.Game.Core.Managers
             //SpawnManager.Instance.AddDespawn(house);
         }
 
-        public bool CalculateBuildingTaxInfo(uint AccountId, HousingTemplate newHouseTemplate, bool buildingNewHouse, out int totalTaxToPay, out int heavyHouseCount, out int normalHouseCount, out int hostileTaxRate)
+        public bool CalculateBuildingTaxInfo(uint AccountId, HousingTemplate newHouseTemplate, bool buildingNewHouse, out int totalTaxToPay, out int heavyHouseCount, out int normalHouseCount, out int hostileTaxRate, out int oneWeekTaxCount)
         {
             totalTaxToPay = 0;
             heavyHouseCount = 0;
             normalHouseCount = 0;
             hostileTaxRate = 0; // NOTE: When castles are added, this needs to be updated depending on ruling guild's settings
+            oneWeekTaxCount = 0;
 
             Dictionary<uint, House> userHouses = new Dictionary<uint, House>();
             if (GetByAccountId(userHouses, AccountId) <= 0)
@@ -744,11 +741,11 @@ namespace AAEmu.Game.Core.Managers
 
             // Default Heavy Tax formula for 1.2
             var taxMultiplier = (heavyHouseCount < MAX_HEAVY_TAX_COUNTED ? heavyHouseCount : MAX_HEAVY_TAX_COUNTED) * 0.5f;
-            // If less than 3 properties, or not a heavy tax peroperty, no extra multiplier needed
+            // If less than 3 properties, or not a heavy tax property, no extra multiplier needed
             if ((heavyHouseCount < 3) || (newHouseTemplate.HeavyTax == false))
                 taxMultiplier = 1f;
 
-            totalTaxToPay = (int)Math.Ceiling(newHouseTemplate.Taxation.Tax * taxMultiplier);
+            totalTaxToPay = oneWeekTaxCount = (int)Math.Ceiling(newHouseTemplate.Taxation.Tax * taxMultiplier);
 
             // If this is a new house, add the deposit (base tax * 2)
             if (buildingNewHouse)
