@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using AAEmu.Commons.Utils;
 using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.World;
+using AAEmu.Game.GameData;
+using AAEmu.Game.Models.Game.AI.Params;
+using AAEmu.Game.Models.Game.AI.Utils;
+using AAEmu.Game.Models.Game.AI.v2.AiCharacters;
 using AAEmu.Game.Models.Game.Items;
 using AAEmu.Game.Models.Game.Merchant;
 using AAEmu.Game.Models.Game.Char;
@@ -33,6 +37,11 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
             if (_templates.ContainsKey(templateId))
                 return _templates[templateId];
             return null;
+        }
+
+        public Dictionary<uint, NpcTemplate> GetAllTemplates()
+        {
+            return _templates;
         }
 
         public MerchantGoods GetGoods(uint id)
@@ -97,6 +106,12 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
                 buff.Apply(npc, obj, npc, null, null, new EffectSource(), null, DateTime.Now);
             }
 
+            foreach (var npcPassiveBuff in template.PassiveBuffs)
+            {
+                var passive = new PassiveBuff() { Template = npcPassiveBuff.PassiveBuff };
+                passive.Apply(npc);
+            }
+
             foreach (var bonusTemplate in template.Bonuses)
             {
                 var bonus = new Bonus();
@@ -107,6 +122,18 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
 
             npc.Hp = npc.MaxHp;
             npc.Mp = npc.MaxMp;
+
+            if (npc.Template.AiFileId > 0)
+            {
+               var ai = AIUtils.GetAiByType((AiParamType)npc.Template.AiFileId, npc);
+               if (ai == null)
+                   return npc;
+
+               npc.Ai = ai;
+               AIManager.Instance.AddAi(ai);
+               npc.Ai.Start();
+            }
+            
             return npc;
         }
 
@@ -562,6 +589,14 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
             }
         }
 
+        public void LoadAiParams()
+        {
+            foreach (var npc in _templates.Values)
+            {
+                npc.AiParams = AiGameData.Instance.GetAiParamsForId((uint)npc.NpcAiParamId);
+            }
+        }
+
         private void SetEquipItemTemplate(Npc npc, uint templateId, EquipmentItemSlot slot, byte grade = 0, bool npcOnly = false)
         {
             if (npcOnly && npc.Equipment.GetItemBySlot((int)slot) != null)
@@ -577,6 +612,14 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
 
             // npc.Equip[(int)slot] = item;
             npc.Equipment.AddOrMoveExistingItem(0, item, (int)slot);
+        }
+
+        public void BindSkillsToTemplate(uint templateId, List<NpcSkill> skills)
+        {
+            if (!_templates.ContainsKey(templateId))
+                return;
+            
+            _templates[templateId].BindSkills(skills);
         }
     }
 }
