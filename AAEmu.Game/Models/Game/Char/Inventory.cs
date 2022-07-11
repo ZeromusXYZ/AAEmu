@@ -1,22 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using AAEmu.Commons.Network;
 using AAEmu.Game.Core.Managers;
-using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.UnitManagers;
-using AAEmu.Game.Core.Packets.C2G;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models.Game.Items;
 using AAEmu.Game.Models.Game.Items.Actions;
 using AAEmu.Game.Models.Game.Items.Templates;
-using AAEmu.Game.Models.Game.Quests;
-using AAEmu.Game.Models.Tasks;
-using AAEmu.Game.Utils.DB;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using MySql.Data.MySqlClient;
 using NLog;
-using NLog.Targets;
 
 namespace AAEmu.Game.Models.Game.Char
 {
@@ -753,10 +744,12 @@ namespace AAEmu.Game.Models.Game.Char
         /// <param name="onlyUpdatedCount"></param>
         public void OnConsumedItem(Item item, int count, bool onlyUpdatedCount = false)
         {
-            // вызов OnItemUse перенес в CSStartSkillPacket - неправильный выбор! отменяем!
             // Quests
             //if ((item?.Template.LootQuestId > 0) && (count != 0))
-            if (count > 0 && item != null)
+            // TODO квест id=4294 "Feeding Your Foal", используемый для посадки предмет ID=23635 "Vita Seed" уже имеет Count= 0, поэтому вызов проверки квеста не происходит
+            // TODO quest id=4294 "Feeding Your Foal", used for planting item id=23635 "Vita Seed" already has Count= 0, so the quest check is not called
+            //if (count > 0 && item != null)
+            if (item != null)
             {
                 Owner?.Quests?.OnItemUse(item);
             }
