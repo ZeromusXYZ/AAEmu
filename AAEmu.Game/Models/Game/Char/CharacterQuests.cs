@@ -178,8 +178,8 @@ namespace AAEmu.Game.Models.Game.Char
             Quests.Remove(questId);
             _removed.Add(questId);
 
-            quest.Owner.SendMessage("[Quest] Quest Npc is not selected! {0}, quest {1} removed.", Owner.Name, questId);
-            _log.Warn("[Quest] Quest Npc is not selected! {0}, quest {1} removed.", Owner.Name, questId);
+            quest.Owner.SendMessage("[Quest] for player: {0}, quest: {1} removed.", Owner.Name, questId);
+            _log.Warn("[Quest] for player: {0}, quest: {1} removed.", Owner.Name, questId);
 
             if (QuestManager.Instance.QuestTimeoutTask.ContainsKey(quest.Owner.Id))
             {
