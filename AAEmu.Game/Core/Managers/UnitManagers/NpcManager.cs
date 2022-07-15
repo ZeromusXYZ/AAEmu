@@ -59,10 +59,11 @@ namespace AAEmu.Game.Core.Managers.UnitManagers
 
         public Npc Create(uint objectId, uint id)
         {
-            if (!_templates.ContainsKey(id))
+            var template = GetTemplate(id);
+            if (template == null)
+            {
                 return null;
-
-            var template = _templates[id];
+            }
 
             var npc = new Npc();
             npc.ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId();

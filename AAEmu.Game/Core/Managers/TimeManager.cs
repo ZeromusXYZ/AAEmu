@@ -42,10 +42,10 @@ namespace AAEmu.Game.Core.Managers
 
         public void Start()
         {
-            var curHours = DateTime.UtcNow.TimeOfDay.Hours;
-            var curMinutes = DateTime.UtcNow.TimeOfDay.Minutes;
-            //_time = 12 * 60 * 60;
-            _time = curHours * 60f + curMinutes * 60f;
+            //var curHours = DateTime.UtcNow.TimeOfDay.Hours;
+            //var curMinutes = DateTime.UtcNow.TimeOfDay.Minutes;
+            _time = 12 * 3600f;
+            //_time = curHours * 60f + curMinutes * 60f;
             _work = true;
             new Thread(Tick) {Name = "TimeManagerThread"}.Start();
         }

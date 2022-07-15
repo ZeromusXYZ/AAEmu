@@ -397,7 +397,7 @@ namespace AAEmu.Game.Models.Game.Quests
                                 }
                                 // компонент - выполнен, мы у нужного Npc
                                 Status = QuestStatus.Ready;
-                                _log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, complete, act.DetailType);
+                                //_log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, complete, act.DetailType);
                                 break;
                             case "QuestActConAutoComplete":
                                 // компонент - выполнен
@@ -446,7 +446,7 @@ namespace AAEmu.Game.Models.Game.Quests
                                 {
                                     // TODO added for quest Id=882.
                                     // ничего не делаем
-                                    _log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, completes[componentIndex], act.DetailType);
+                                    //_log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, completes[componentIndex], act.DetailType);
                                     break;
                                 }
                             case "QuestActObjItemGather":
@@ -464,23 +464,11 @@ namespace AAEmu.Game.Models.Game.Quests
                                         selectives.Add(completes[componentIndex]);
                                         selective = true;
                                     }
-                                    // проверка результатов на валидность
-                                    if (complete)
-                                    {
-                                        // компонент - выполнен
-                                        Status = QuestStatus.Ready;
-                                    }
-                                    else
-                                    {
-                                        // компонент - в процессе выполнения
-                                        Status = QuestStatus.Progress;
-                                        ComponentId = 0;
-                                        // если complete == false, также надо слать пакет SCQuestContextUpdatedPacket
-                                    }
-                                    _log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, completes[componentIndex], act.DetailType);
+                                    Status = complete ? QuestStatus.Ready : QuestStatus.Progress;
                                     break;
                                 }
                             default:
+                                //case "QuestActObjItemUse":
                                 //case "QuestActObjMonsterHunt":
                                 //case "QuestActObjMonsterGroupHunt":
                                 // эти акты могут быть парными: ItemGather & MonsterHunt & MonsterGroupHunt & Interaction
@@ -488,23 +476,19 @@ namespace AAEmu.Game.Models.Game.Quests
                                     complete = act.Use(Owner, this, Objectives[componentIndex]);
                                     completes[componentIndex] = complete; // продублируем информацию
                                     // проверка результатов на валидность
-                                    if (complete)
+                                    if (Template.Selective)
                                     {
-                                        // компонент - выполнен
-                                        Status = QuestStatus.Ready;
+                                        // Если Selective = true, то разрешается быть подходящим одному предмету из нескольких
+                                        selectives.Add(completes[componentIndex]);
+                                        selective = true;
                                     }
-                                    else
-                                    {
-                                        // компонент - в процессе выполнения
-                                        Status = QuestStatus.Progress;
-                                        ComponentId = 0;
+                                    Status = complete ? QuestStatus.Ready : QuestStatus.Progress;
                                         // если complete == false, также надо слать пакет SCQuestContextUpdatedPacket
-                                    }
-                                    _log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, complete, act.DetailType);
                                     break;
                                 }
                         }
                         SupplyItem = 0;
+                        _log.Warn("[Quest] Update: character {0}, do it - {1}, ComponentId {2}, Step {3}, Status {4}, complete {5}, act.DetailType {6}", Owner.Name, TemplateId, ComponentId, Step, Status, complete, act.DetailType);
                     }
 
                     if (completes[componentIndex] || complete)
@@ -517,18 +501,10 @@ namespace AAEmu.Game.Models.Game.Quests
                 // TODO added for quest Id=1511 - обязательно выполнение обеих элементов itemGather
                 if (components.Length > 1)
                 {
-                    complete = Template.Score > 0 ? completes.Any(b => b == true) : completes.All(b => b == true);
-                    if (complete)
-                    {
-                        Status = QuestStatus.Ready;
-                    }
-                    else
-                    {
-                        Status = QuestStatus.Progress;
-                        ComponentId = 0;
-                    }
+                    // TODO added for quest id=4294 - нужен только itemGather, а ItemUse не нужен
+                    complete = Template.Score > 0 ? completes.Any(b => b) : completes.All(b => b);
+                    Status = complete ? QuestStatus.Ready : QuestStatus.Progress;
                 }
-
                 if (selective)
                 {
                     // Если Selective = true, то разрешается быть подходящим одному предмету из нескольких
@@ -538,7 +514,6 @@ namespace AAEmu.Game.Models.Game.Quests
                         complete = true;
                     }
                 }
-
                 if (complete && (EarlyCompletion || ExtraCompletion))
                 {
                     break; // квест можно сдать, но мы не даем ему закончиться при достижении 100% пока сами не подойдем к Npc сдавать квест
