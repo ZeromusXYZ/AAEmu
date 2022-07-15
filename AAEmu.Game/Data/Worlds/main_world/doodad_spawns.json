@@ -427466,7 +427466,79 @@
     }
   },
   {
-    "Id": 73082,
+    "Id": 73083,
+    "UnitId": 7583, // Ayanad Library Task Board
+    "Position": {
+      "X": 19506.5,
+      "Y": 27021.4,
+      "Z": 131.4,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": -40.0
+    }
+  },
+  {
+    "Id": 73084,
+    "UnitId": 7583, // Ayanad Library Task Board
+    "Position": {
+      "X": 19397,
+      "Y": 26971.4,
+      "Z": 131.2,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": 55.0
+    }
+  },
+  {
+    "Id": 73085,
+    "UnitId": 7583, // Ayanad Library Task Board
+    "Position": {
+      "X": 19393.8,
+      "Y": 27115.5,
+      "Z": 131.3,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": -30.0
+    }
+  },
+  {
+    "Id": 73086,
+    "UnitId": 8043, // Disciple's Workbench 
+    "Position": {
+      "X": 19509.2,
+      "Y": 27018.0,
+      "Z": 131.3,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": -40.0
+    }
+  },
+  {
+    "Id": 73087,
+    "UnitId": 8043, // Disciple's Workbench 
+    "Position": {
+      "X": 19394.3,
+      "Y": 26968.3,
+      "Z": 131.2,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": -130.0
+    }
+  },
+  {
+    "Id": 73089,
+    "UnitId": 8043, // Disciple's Workbench 
+    "Position": {
+      "X": 19390.4,
+      "Y": 27118.1,
+      "Z": 131.32,
+      "Roll": 0.0,
+      "Pitch": 0.0,
+      "Yaw": 150.0
+    }
+  },
+  {
+    "Id": 73090,
     "UnitId": 4263, // Souleye 
     "Position": {
       "X": 19025.5,
