@@ -861,25 +861,28 @@ public class Npc : Unit
 
     public void ClearAggroOfUnit(Unit unit)
     {
-        if (unit is null)
+        if (unit == null)
             return;
 
         var player = unit as Character;
+        player?.SendMessage(AAEmu.Game.Models.Game.Chat.ChatType.System, $"ClearAggroOfUnit {player.Name} for {this.ObjId}");
 
-        // player?.SendMessage(ChatType.System, $"ClearAggroOfUnit {player.Name} for {this.ObjId}");
-
-        var lastAggroCount = AggroTable.Count;
-        if (AggroTable.TryRemove(unit.ObjId, out var value))
+        var aggroTableChanged = false;
+        if (AggroTable.Count > 0)
         {
-            unit.Events.OnHealed -= OnAbuserHealed;
-            unit.Events.OnDeath -= OnAbuserDied;
-        }
-        else
-        {
-            Logger.Warn("Failed to remove unit[{0}] aggro from NPC[{1}]", unit.ObjId, this.ObjId);
+            if (AggroTable.TryRemove(unit.ObjId, out var value))
+            {
+                unit.Events.OnHealed -= OnAbuserHealed;
+                unit.Events.OnDeath -= OnAbuserDied;
+                aggroTableChanged = true;
+            }
+            else
+            {
+                Logger.Warn($"Failed to remove unit[{unit.ObjId}] aggro from NPC[{ObjId}]");
+            }
         }
 
-        if (AggroTable.Count != lastAggroCount)
+        if (aggroTableChanged)
             CheckIfEmptyAggroToReturn();
     }
 
@@ -911,10 +914,11 @@ public class Npc : Unit
             }
         }
 
-        var lastAggroCount = AggroTable.Count;
+        if (AggroTable.Count <= 0)
+            return;
+
         AggroTable.Clear();
-        if (lastAggroCount > 0)
-            CheckIfEmptyAggroToReturn();
+        CheckIfEmptyAggroToReturn();
     }
 
     public void OnAbuserHealed(object sender, OnHealedArgs args)
@@ -1111,6 +1115,7 @@ public class Npc : Unit
         BroadcastPacket(new SCTargetChangedPacket(ObjId, other?.ObjId ?? 0), true);
         Ai.AlreadyTargetted = other != null;
     }
+
     public void FindPath(Unit abuser)
     {
         Ai.PathNode.pos1 = new Point(Ai.Owner.Transform.World.Position.X, Ai.Owner.Transform.World.Position.Y, Ai.Owner.Transform.World.Position.Z);

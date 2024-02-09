@@ -240,15 +240,22 @@ public abstract class Behavior
         }
     }
 
-    public void UpdateAggroHelp(Unit abuser, int radius = 20)
+    /// <summary>
+    /// Check if this NPC can get help, and if so, make them aggro the abuser
+    /// </summary>
+    /// <param name="abuser">The attacking Unit</param>
+    /// <param name="radius">Maximum range to check for help, this is not the range of the NPCs that will help, but rather possibly help. Maximum range defined in the DB is 100m</param>
+    protected void UpdateAggroHelp(Unit abuser, float radius = 100f)
     {
-        var npcs = WorldManager.GetAround<Npc>(Ai.Owner, radius);
-        if (npcs == null)
-            return;
+        // Get a list of all NPCs inside the max radius, and filter them based on their criteria
+        var npcs = WorldManager.GetAround<Npc>(Ai.Owner, radius)
+            .Where(npc => npc.Template.Aggression &&
+                          !npc.IsInBattle &&
+                          npc.Template.AcceptAggroLink &&
+                          npc.GetDistanceTo(npc.Ai.Owner) <= npc.Template.AggroLinkHelpDist)
+            .ToList();
 
-        foreach (var npc in npcs
-                     .Where(npc => npc.Template.Aggression && !npc.IsInBattle && npc.Template.AcceptAggroLink)
-                     .Where(npc => npc.GetDistanceTo(npc.Ai.Owner) <= npc.Template.AggroLinkHelpDist))
+        foreach (var npc in npcs)
         {
             npc.Ai.Owner.AddUnitAggro(AggroKind.Damage, abuser, 1);
             npc.Ai.GoToCombat();
