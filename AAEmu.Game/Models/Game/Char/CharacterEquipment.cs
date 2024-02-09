@@ -140,49 +140,47 @@ public partial class Character
 
     private void ApplyArmorGradeBuff(Item itemAdded, Item itemRemoved)
     {
-        if ((itemAdded != null || itemRemoved != null) && (!(itemAdded is Armor) && !(itemRemoved is Armor)))
+        if ((itemAdded != null || itemRemoved != null) && (itemAdded is not Items.Armor && itemRemoved is not Items.Armor))
             return;
 
         // Clear any existing armor grade buffs
         Buffs.RemoveBuffs((uint)BuffConstants.ArmorBuffTag, 10);
 
         // Get armor pieces by kind
-        var armorPieces = new Dictionary<ArmorType, List<Armor>>();
+        var armorPiecesByArmorType = new Dictionary<ArmorType, List<Armor>>();
         foreach (var item in Equipment.Items)
         {
-            if (!(item is Armor armor))
+            if (item is not Armor armor)
                 continue;
 
-            if (!(item.Template is ArmorTemplate armorTemplate))
+            if (item.Template is not ArmorTemplate armorTemplate)
                 continue;
 
             if (armorTemplate.SlotTemplate.SlotTypeId == (ulong)EquipmentItemSlotType.Back)
                 continue;
 
-            if (!armorPieces.ContainsKey((ArmorType)armorTemplate.KindTemplate.TypeId))
-                armorPieces.Add((ArmorType)armorTemplate.KindTemplate.TypeId, new List<Armor>());
-            armorPieces[(ArmorType)armorTemplate.KindTemplate.TypeId].Add(armor);
+            if (!armorPiecesByArmorType.TryGetValue((ArmorType)armorTemplate.KindTemplate.TypeId, out var armorPieceList))
+            {
+                armorPieceList = new List<Armor>();
+                armorPiecesByArmorType.Add((ArmorType)armorTemplate.KindTemplate.TypeId,armorPieceList);
+            }
+            armorPieceList.Add(armor);
         }
 
-        if (armorPieces.Count == 0)
+        if (armorPiecesByArmorType.Count == 0)
             return;
+
         // Get kind with most pieces
-        var piecesOfKind = armorPieces.First();
-        foreach (var piecesByKind in armorPieces)
-        {
-            if (piecesByKind.Value.Count > piecesOfKind.Value.Count) piecesOfKind = piecesByKind;
-        }
+        var mostPieces = armorPiecesByArmorType.MaxBy(x => x.Value.Count);
 
-        var piecesToAccountForBuff = piecesOfKind.Value;
-
-        if (piecesToAccountForBuff.Count < 4)
+        if (mostPieces.Value.Count < 4)
             return;
 
-        var finalArmorTemplate = piecesToAccountForBuff.First().Template as ArmorTemplate;
+        var finalArmorTemplate = mostPieces.Value.First().Template as ArmorTemplate;
         if (finalArmorTemplate == null)
             return;
 
-        if (piecesToAccountForBuff.Count == 7)
+        if (mostPieces.Value.Count == 7)
         {
             BuffTemplate templ = null;
             switch ((ArmorType)finalArmorTemplate.WearableTemplate.TypeId)
@@ -222,7 +220,7 @@ public partial class Character
         }
 
         // Get only pieces >= arcane
-        var piecesAboveArcane = piecesToAccountForBuff.Where(p => p.Grade >= (int)ItemGrade.Arcane).ToList();
+        var piecesAboveArcane = mostPieces.Value.Where(p => p.Grade >= (int)ItemGrade.Arcane).ToList();
         if (piecesAboveArcane.Count < 4)
             return;
 
@@ -233,7 +231,7 @@ public partial class Character
         var gradeBuffAbLevel = (abLevel * abLevel) / 15 + 30;
         var lowestGrade = piecesAboveArcane.Min(a => a.Grade);
 
-        // Apply buff 
+        // Apply buff
         if (piecesAboveArcane.First().Template is ArmorTemplate armorTemp)
         {
             var type = armorTemp.WearableTemplate.TypeId;
