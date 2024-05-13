@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Numerics;
 
 using AAEmu.Game.Core.Managers.World;
-
+using AAEmu.Game.Utils;
 using Newtonsoft.Json;
 
 namespace AAEmu.Game.Models.Game.World.Transform;
@@ -77,14 +77,22 @@ public class WorldSpawnPosition
         return new Vector3(X, Y, Z);
     }
 
+    /// <summary>
+    /// Returns the Quaternion for this WorldSpawnPosition
+    /// </summary>
+    /// <returns></returns>
     public Quaternion AsRotationQuaternion()
     {
         return Quaternion.CreateFromYawPitchRoll(Yaw, Pitch, Roll);
     }
 
+    /// <summary>
+    /// Readable String representation
+    /// </summary>
+    /// <returns></returns>
     public override string ToString()
     {
-        return string.Format("X:{0:#,0.#} Y:{1:#,0.#} Z:{2:#,0.#}  r:{3:#,0.#}° p:{4:#,0.#}° y:{5:#,0.#}°", X, Y, Z, Roll, Pitch, Yaw);
+        return $"X:{X:#,0.#} Y:{Y:#,0.#} Z:{Z:#,0.#}  r:{Roll.RadToDeg():#,0.#}° p:{Pitch.RadToDeg():#,0.#}° y:{Yaw.RadToDeg():#,0.#}°";
     }
 
     public override bool Equals(object obj)

@@ -8,8 +8,19 @@ namespace AAEmu.Game.Models.Game.World.Transform;
 
 public class PositionAndRotation
 {
+    /// <summary>
+    /// Marks if this a Local Transform
+    /// </summary>
     public bool IsLocal { get; set; } = true;
+    
+    /// <summary>
+    /// Position in 3D Space
+    /// </summary>
     public Vector3 Position { get; set; }
+    
+    /// <summary>
+    /// Rotation in 3D Space (Roll, Pitch, Yaw)
+    /// </summary>
     public Vector3 Rotation { get; set; }
 
     private const float ToSByteDivider = (1f / 127f); // ~0.007874015748f ;
@@ -69,6 +80,10 @@ public class PositionAndRotation
         Rotation = new Vector3(roll, pitch, yaw);
     }
 
+    /// <summary>
+    /// Generates 3 shorts using quaternion truncated format
+    /// </summary>
+    /// <returns></returns>
     public (short, short, short) ToRollPitchYawShorts()
     {
         var q = ToQuaternion();
@@ -77,6 +92,10 @@ public class PositionAndRotation
         return ((short)(q.X * short.MaxValue), (short)(q.Y * short.MaxValue), (short)(q.Z * short.MaxValue));
     }
 
+    /// <summary>
+    /// Generates 3 sbyte for rotation
+    /// </summary>
+    /// <returns></returns>
     public (sbyte, sbyte, sbyte) ToRollPitchYawSBytes()
     {
         var roll = (sbyte)(Rotation.X / TwoPi / ToSByteDivider);
@@ -85,6 +104,10 @@ public class PositionAndRotation
         return (roll, pitch, yaw);
     }
 
+    /// <summary>
+    /// Generate 3 sbyte for rotation used in movement packets
+    /// </summary>
+    /// <returns></returns>
     public (sbyte, sbyte, sbyte) ToRollPitchYawSBytesMovement()
     {
         sbyte roll = MathUtil.ConvertRadianToDirection(Rotation.X - TwoPi);
@@ -98,11 +121,23 @@ public class PositionAndRotation
         return (roll, pitch, yaw);
     }
 
+    /// <summary>
+    /// Update Roll Pitch Yaw in radians
+    /// </summary>
+    /// <param name="roll"></param>
+    /// <param name="pitch"></param>
+    /// <param name="yaw"></param>
     public void SetRotation(float roll, float pitch, float yaw)
     {
         Rotation = new Vector3(roll, pitch, yaw);
     }
 
+    /// <summary>
+    /// Update Roll Pitch Yaw using degrees
+    /// </summary>
+    /// <param name="roll"></param>
+    /// <param name="pitch"></param>
+    /// <param name="yaw"></param>
     public void SetRotationDegree(float roll, float pitch, float yaw)
     {
         Rotation = new Vector3(roll.DegToRad(), pitch.DegToRad(), yaw.DegToRad());
@@ -117,12 +152,20 @@ public class PositionAndRotation
         Rotation = new Vector3(Rotation.X, Rotation.Y, rotZ);
     }
 
+    /// <summary>
+    /// Set Yaw using short
+    /// </summary>
+    /// <param name="rotZ"></param>
     public void SetZRotation(short rotZ)
     {
         Rotation = new Vector3(Rotation.X, Rotation.Y,
             (float)MathUtil.ConvertDirectionToRadian(Helpers.ConvertRotation(rotZ)));
     }
 
+    /// <summary>
+    /// Set Yaw using sbyte
+    /// </summary>
+    /// <param name="rotZ"></param>
     public void SetZRotation(sbyte rotZ)
     {
         Rotation = new Vector3(Rotation.X, Rotation.Y, (float)MathUtil.ConvertDirectionToRadian(rotZ));
@@ -147,12 +190,22 @@ public class PositionAndRotation
     public void Translate(float offsetX, float offsetY, float offsetZ) =>
         Translate(new Vector3(offsetX, offsetY, offsetZ));
 
+    /// <summary>
+    /// Apply RPY rotation
+    /// </summary>
+    /// <param name="offset"></param>
     public void Rotate(Vector3 offset)
     {
         // Is this correct ?
         Rotation += offset;
     }
 
+    /// <summary>
+    /// Apply RPY rotation
+    /// </summary>
+    /// <param name="roll"></param>
+    /// <param name="pitch"></param>
+    /// <param name="yaw"></param>
     public void Rotate(float roll, float pitch, float yaw)
     {
         // Is this correct ?
@@ -226,10 +279,9 @@ public class PositionAndRotation
     }
 
     public void AddDistance(Vector3 move) => AddDistance(move.X, move.Y, move.Z);
-    public void SubDistance(Vector3 move) => AddDistance(-move.X, -move.Y, -move.Z);
+    public void SubtractDistance(Vector3 move) => AddDistance(-move.X, -move.Y, -move.Z);
 
     /// <summary>
-
     /// Rotates Transform to make it face towards targetPosition's direction
     /// </summary>
     /// <param name="targetPosition"></param>
@@ -258,11 +310,13 @@ public class PositionAndRotation
 
     public override string ToString()
     {
-        return string.Format("X:{0:#,0.#} Y:{1:#,0.#} Z:{2:#,0.#}  r:{3:#,0.#}° p:{4:#,0.#}° y:{5:#,0.#}°",
-            Position.X, Position.Y, Position.Z, Rotation.X.RadToDeg(), Rotation.Y.RadToDeg(),
-            Rotation.Z.RadToDeg());
+        return $"X:{Position.X:#,0.#} Y:{Position.Y:#,0.#} Z:{Position.Z:#,0.#}  r:{Rotation.X.RadToDeg():#,0.#}° p:{Rotation.Y.RadToDeg():#,0.#}° y:{Rotation.Z.RadToDeg():#,0.#}°";
     }
 
+    /// <summary>
+    /// Does the position equal ~ zero
+    /// </summary>
+    /// <returns></returns>
     public bool IsOrigin()
     {
         return Position.Equals(Vector3.Zero);
@@ -277,15 +331,15 @@ public class PositionAndRotation
         return ToQuaternion(Rotation);
     }
 
-    public static Quaternion ToQuaternion(Vector3 rotationVector3) // yaw (Z), pitch (Y), roll (X)
+    public static Quaternion ToQuaternion(Vector3 rpy) // yaw (Z), pitch (Y), roll (X)
     {
         // Abbreviations for the various angular functions
-        var cy = MathF.Cos(rotationVector3.Z * 0.5f);
-        var sy = MathF.Sin(rotationVector3.Z * 0.5f);
-        var cp = MathF.Cos(rotationVector3.Y * 0.5f);
-        var sp = MathF.Sin(rotationVector3.Y * 0.5f);
-        var cr = MathF.Cos(rotationVector3.X * 0.5f);
-        var sr = MathF.Sin(rotationVector3.X * 0.5f);
+        var cy = MathF.Cos(rpy.Z * 0.5f);
+        var sy = MathF.Sin(rpy.Z * 0.5f);
+        var cp = MathF.Cos(rpy.Y * 0.5f);
+        var sp = MathF.Sin(rpy.Y * 0.5f);
+        var cr = MathF.Cos(rpy.X * 0.5f);
+        var sr = MathF.Sin(rpy.X * 0.5f);
 
         Quaternion q;
         q.W = cr * cp * cy + sr * sp * sy;
@@ -324,6 +378,11 @@ public class PositionAndRotation
         return angles;
     }
 
+    /// <summary>
+    /// Create RPY 
+    /// </summary>
+    /// <param name="q"></param>
+    /// <returns></returns>
     public static Vector3 FromQuaternion(Quaternion q)
     {
         return FromQuaternion(q.X, q.Y, q.Z, q.W);

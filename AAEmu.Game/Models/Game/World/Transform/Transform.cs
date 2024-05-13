@@ -20,72 +20,74 @@ namespace AAEmu.Game.Models.Game.World.Transform;
 /// </summary>
 public class Transform : IDisposable
 {
-    private GameObject _owningObject;
-    private uint _worldId = WorldManager.DefaultWorldId;
-    private uint _instanceId = WorldManager.DefaultInstanceId;
-    private uint _zoneId = 0;
-    private PositionAndRotation _localPosRot;
     private Transform _parentTransform;
-    private List<Transform> _children;
     private Transform _stickyParentTransform;
-    private List<Transform> _stickyChildren;
-    private Vector3 _lastFinalizePos; // Might use this later for cheat detection or delta movement
-    public List<Character> _debugTrackers;
-    private object _lock = new();
+    private Vector3 _lastFinalizePos = Vector3.Zero; // Might use this later for cheat detection or delta movement
+    public List<Character> _debugTrackers = [];
+    private readonly object _lock = new();
 
     /// <summary>
     /// Parent Transform this Transform is attached to, leave null for World
     /// </summary>
     public Transform Parent { get => _parentTransform; set => SetParent(value); }
+
     /// <summary>
     /// List of Child Transforms of this Transform
     /// </summary>
-    public List<Transform> Children { get => _children; }
+    public List<Transform> Children { get; private set; } = [];
+
     public Transform StickyParent { get => _stickyParentTransform; set => SetStickyParent(value); }
+
     /// <summary>
     /// List of Transforms that are linked to this object, but aren't direct children.
     /// Objects in this list need their positions updated when this object's local transform changes.
     /// Used for ladders on ships for example, only updates children if FinalizeTransform() is called
     /// FinalizeTransform takes the delta from previous call to calculate the delta movement
     /// </summary>
-    public List<Transform> StickyChildren { get => _stickyChildren; }
+    public List<Transform> StickyChildren { get; private set; } = [];
+
     /// <summary>
     /// The GameObject this Transform is attached to
     /// </summary>
-    public GameObject GameObject { get => _owningObject; }
+    public GameObject GameObject { get; private set; }
+
     /// <summary>
     /// World ID
     /// </summary>
-    public uint WorldId { get => _worldId; set => _worldId = value; }
+    public uint WorldId { get; set; } = WorldManager.DefaultWorldId;
+
     /// <summary>
     /// Instance ID
     /// </summary>
-    public uint InstanceId { get => _instanceId; set => _instanceId = value; }
+    public uint InstanceId { get; set; } = WorldManager.DefaultInstanceId;
+
     /// <summary>
     /// Zone ID (Key)
     /// </summary>
-    public uint ZoneId { get => _zoneId; set => _zoneId = value; }
+    public uint ZoneId { get; set; }
+
     /// <summary>
     /// The Local Transform information (relative to Parent)
     /// </summary>
-    public PositionAndRotation Local { get => _localPosRot; }
+    public PositionAndRotation Local { get; private set; } = new();
+
     /// <summary>
     /// The Global Transform information (relative to game world)
     /// </summary>
     public PositionAndRotation World { get => GetWorldPosition(); }
     // TODO: It MIGHT be interesting to cache the world Transform, but would generate more overhead when moving parents (vehicles/mounts)
 
+    /// <summary>
+    /// Main helper function to initialize Owner and Parents, use in constructors
+    /// </summary>
+    /// <param name="owningObject"></param>
+    /// <param name="parentTransform"></param>
+    /// <param name="stickyParentTransform"></param>
     private void InternalInitializeTransform(GameObject owningObject, Transform parentTransform, Transform stickyParentTransform)
     {
-        _owningObject = owningObject;
+        GameObject = owningObject;
         _parentTransform = parentTransform;
         _stickyParentTransform = stickyParentTransform;
-        _children = new List<Transform>();
-        _localPosRot = new PositionAndRotation();
-        //_stickyParentTransform = null; // TODO why are we doing this?
-        _stickyChildren = new List<Transform>();
-        _lastFinalizePos = Vector3.Zero;
-        _debugTrackers = new List<Character>();
     }
 
     public Transform(GameObject owningObject, Transform parentTransform = null, Transform stickyParentTransform = null)
@@ -112,6 +114,13 @@ public class Transform : IDisposable
         Local.Rotation = new Vector3(roll, pitch, yaw);
     }
 
+    /// <summary>
+    /// Create Transform and set Local to position and rotation AFTER assigning the parent Transform
+    /// </summary>
+    /// <param name="owningObject"></param>
+    /// <param name="parentTransform"></param>
+    /// <param name="position"></param>
+    /// <param name="rotation"></param>
     public Transform(GameObject owningObject, Transform parentTransform, Vector3 position, Vector3 rotation)
     {
         InternalInitializeTransform(owningObject, parentTransform, null);
@@ -145,7 +154,7 @@ public class Transform : IDisposable
         WorldId = worldId;
         ZoneId = zoneId;
         InstanceId = instanceId;
-        _localPosRot = new PositionAndRotation(posRot.Position, posRot.Rotation);
+        Local = new PositionAndRotation(posRot.Position, posRot.Rotation);
     }
 
     /// <summary>
@@ -154,7 +163,7 @@ public class Transform : IDisposable
     /// <returns></returns>
     public Transform Clone()
     {
-        return new Transform(_owningObject, _parentTransform, WorldId, ZoneId, InstanceId, _localPosRot);
+        return new Transform(GameObject, _parentTransform, WorldId, ZoneId, InstanceId, Local);
     }
 
     /// <summary>
@@ -164,7 +173,7 @@ public class Transform : IDisposable
     /// <returns></returns>
     public Transform Clone(GameObject newOwner)
     {
-        return new Transform(newOwner, _parentTransform, WorldId, ZoneId, InstanceId, _localPosRot);
+        return new Transform(newOwner, _parentTransform, WorldId, ZoneId, InstanceId, Local);
     }
 
     /// <summary>
@@ -242,8 +251,8 @@ public class Transform : IDisposable
         for (var i = Children.Count - 1; i >= 0; i--)
             Children[i].Parent = null;
         if (!keepStickyParent)
-            for (var i = _stickyChildren.Count - 1; i >= 0; i--)
-                _stickyChildren[i].StickyParent = null;
+            for (var i = StickyChildren.Count - 1; i >= 0; i--)
+                StickyChildren[i].StickyParent = null;
     }
 
     /// <summary>
@@ -291,7 +300,7 @@ public class Transform : IDisposable
                 _parentTransform = parent;
                 _parentTransform?.InternalAttachChild(this);
 
-                if ((_owningObject is Character aPlayer))
+                if ((GameObject is Character aPlayer))
                     aPlayer.SendMessage($"NewPos: {ToFullString(true, true)}");
             }
         }
@@ -299,9 +308,9 @@ public class Transform : IDisposable
 
     private void InternalAttachChild(Transform child)
     {
-        if (!_children.Contains(child))
+        if (!Children.Contains(child))
         {
-            _children.Add(child);
+            Children.Add(child);
             // TODO: This needs better handling and take into account rotations
             //child.Local.SubDistance(World.Position);
             //child.Local.Position -= World.Position;
@@ -319,9 +328,9 @@ public class Transform : IDisposable
 
     private void InternalDetachChild(Transform child)
     {
-        if (_children.Contains(child))
+        if (Children.Contains(child))
         {
-            _children.Remove(child);
+            Children.Remove(child);
             // TODO: This needs better handling and take into account rotations
             child.Local.Rotation += World.Rotation;
             child.Local.Position += World.Position;
@@ -338,7 +347,7 @@ public class Transform : IDisposable
     private PositionAndRotation GetWorldPosition()
     {
         if (_parentTransform == null)
-            return _localPosRot;
+            return Local;
         var res = _parentTransform.GetWorldPosition().Clone();
 
         // TODO: This is not taking into account parent rotation !
@@ -396,17 +405,17 @@ public class Transform : IDisposable
         //}
 
         // TODO: Check if/make sure rotations are taken into account
-        if (_stickyChildren.Count > 0)
+        if (StickyChildren.Count > 0)
         {
-            for (var i = _stickyChildren.Count - 1; i >= 0; i--)
+            for (var i = StickyChildren.Count - 1; i >= 0; i--)
             {
-                var stickyChild = _stickyChildren[i];
+                var stickyChild = StickyChildren[i];
                 if (stickyChild == null)
                     continue;
 
                 stickyChild.Local.Translate(worldPosDelta);
                 stickyChild.FinalizeTransform(includeChildren);
-                WorldManager.Instance.AddVisibleObject(stickyChild._owningObject);
+                WorldManager.Instance.AddVisibleObject(stickyChild.GameObject);
 
                 //if (!(stickyChild.GameObject is Unit))
                 //    continue;
@@ -441,13 +450,13 @@ public class Transform : IDisposable
             }
         }
 
-        if (_owningObject == null)
+        if (GameObject == null)
             return;
 
-        if (!_owningObject.DisabledSetPosition)
-            WorldManager.Instance.AddVisibleObject(_owningObject);
+        if (!GameObject.DisabledSetPosition)
+            WorldManager.Instance.AddVisibleObject(GameObject);
 
-        if (_owningObject is Slave slave)
+        if (GameObject is Slave slave)
         {
             foreach (var dood in slave.AttachedDoodads)
                 WorldManager.Instance.AddVisibleObject(dood);
@@ -455,7 +464,7 @@ public class Transform : IDisposable
                 WorldManager.Instance.AddVisibleObject(chld);
         }
 
-        if (_owningObject is Transfer transfer)
+        if (GameObject is Transfer transfer)
         {
             foreach (var doodad in transfer.AttachedDoodads)
                 WorldManager.Instance.AddVisibleObject(doodad);
@@ -472,7 +481,7 @@ public class Transform : IDisposable
                 }
             }
         }
-        if (_owningObject is Units.Mate pet && pet.OwnerObjId > 0)
+        if (GameObject is Units.Mate pet && pet.OwnerObjId > 0)
         {
             var chr = WorldManager.Instance.GetCharacterByObjId(pet.OwnerObjId);
             WorldManager.Instance.AddVisibleObject(chr);
@@ -480,16 +489,16 @@ public class Transform : IDisposable
 
         if (includeChildren)
         {
-            for (var i = _children.Count - 1; i >= 0; i--)
+            for (var i = Children.Count - 1; i >= 0; i--)
             {
-                var child = _children[i];
+                var child = Children[i];
                 if (child != null)
                     child.FinalizeTransform(includeChildren);
             }
         }
 
         ResetFinalizeTransform();
-        _owningObject.SetPosition(Local.Position.X, Local.Position.Y, Local.Position.Z, Local.Rotation.X, Local.Rotation.Y, Local.Rotation.Z);
+        GameObject.SetPosition(Local.Position.X, Local.Position.Y, Local.Position.Z, Local.Rotation.X, Local.Rotation.Y, Local.Rotation.Z);
     }
 
     public void ResetFinalizeTransform()
@@ -519,7 +528,7 @@ public class Transform : IDisposable
         if (_parentTransform != null)
         {
             res += "\n on ( ";
-            if (_parentTransform._owningObject is BaseUnit bu)
+            if (_parentTransform.GameObject is BaseUnit bu)
             {
                 if (bu.Name != string.Empty)
                     res += chatColorGreen + bu.Name + chatColorRestore + " ";
@@ -533,7 +542,7 @@ public class Transform : IDisposable
         if (_stickyParentTransform != null)
         {
             res += "\n=> sticking to ( ";
-            if (_stickyParentTransform._owningObject is BaseUnit bu)
+            if (_stickyParentTransform.GameObject is BaseUnit bu)
             {
                 if (bu.Name != string.Empty)
                     res += chatColorYellow + bu.Name + chatColorRestore + " ";
@@ -574,7 +583,7 @@ public class Transform : IDisposable
     public void DetachStickyTransform(Transform stickyChild)
     {
         if (StickyChildren.Contains(stickyChild))
-            _stickyChildren.Remove(stickyChild);
+            StickyChildren.Remove(stickyChild);
         stickyChild._stickyParentTransform = null;
     }
 
