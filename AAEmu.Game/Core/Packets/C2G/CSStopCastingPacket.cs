@@ -1,4 +1,4 @@
-﻿using AAEmu.Commons.Network;
+using AAEmu.Commons.Network;
 using AAEmu.Game.Core.Network.Game;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models.Tasks.Skills;
@@ -24,34 +24,57 @@ public class CSStopCastingPacket : GamePacket
             return;
         }
 
-        if (plotTlId != 0 && Connection.ActiveChar.ActivePlotState != null)
+        var stopHandled = false;
+        if (plotTlId != 0)
         {
-            if (Connection.ActiveChar.ActivePlotState.ActiveSkill.TlId == plotTlId)
+            // Check if valid PlotId
+            if (Connection.ActiveChar.ActivePlotState != null)
             {
-                Connection.ActiveChar.ActivePlotState.RequestCancellation();
+                // Check if plotTlId is that of the active skill
+                if (Connection.ActiveChar.ActivePlotState.ActiveSkill.TlId == plotTlId)
+                {
+                    // Request a cancel if it is
+                    if (!Connection.ActiveChar.ActivePlotState.CancellationRequested())
+                        Connection.ActiveChar.ActivePlotState.RequestCancellation();
+                    stopHandled = true;
+                }
+                else
+                {
+                    // Just send stopped packets otherwise
+                    Connection.SendPacket(new SCPlotCastingStoppedPacket(plotTlId, 0, 1));
+                    Connection.SendPacket(new SCPlotChannelingStoppedPacket(plotTlId, 0, 1));
+                    stopHandled = true;
+                }
             }
             else
             {
-                Connection.SendPacket(new SCPlotCastingStoppedPacket(plotTlId, 0, 1));
-                Connection.SendPacket(new SCPlotChannelingStoppedPacket(plotTlId, 0, 1));
+                Logger.Warn($"Player {Connection.ActiveChar.Name} (ObjId {Connection.ActiveChar.ObjId}) is trying to cancel a skill plot with {plotTlId}, but no plot is currently active.");
             }
         }
 
-        if (Connection.ActiveChar.SkillTask == null || Connection.ActiveChar.SkillTask.Skill.TlId != tlId)
+        if (tlId > 0)
         {
-            Logger.Warn($"Stop requested, but no skill active? Tl: {tlId}, Pid: {plotTlId}, objId: {objId}, Character: {Connection.ActiveChar.Name}");
-            return;
-        }
+            if (Connection.ActiveChar.SkillTask == null || Connection.ActiveChar.SkillTask.Skill.TlId != tlId)
+            {
+                Logger.Warn($"Stop requested, but no skill active? Tl: {tlId}, Pid: {plotTlId}, objId: {objId}, Character: {Connection.ActiveChar.Name}");
+                return;
+            }
 
         Connection.ActiveChar.SkillTask.Cancel();
 
-        if (Connection.ActiveChar.SkillTask is EndChannelingTask ect)
-        {
-            Connection.ActiveChar.SkillTask.Skill.Stop(Connection.ActiveChar, ect._channelDoodad);
+            if (Connection.ActiveChar.SkillTask is EndChannelingTask ect)
+            {
+                Connection.ActiveChar.SkillTask.Skill.Stop(Connection.ActiveChar, ect._channelDoodad);
+            }
+            else
+            {
+                Connection.ActiveChar.SkillTask.Skill.Stop(Connection.ActiveChar);
+            }
         }
-        else
+
+        if (!stopHandled)
         {
-            Connection.ActiveChar.SkillTask.Skill.Stop(Connection.ActiveChar);
+            Logger.Warn($"Player {Connection.ActiveChar.Name} (ObjId {Connection.ActiveChar.ObjId}) is trying to stop a skill, but failed to: objId {objId}, tlId {tlId}, plotTlId {plotTlId}");            
         }
     }
 }

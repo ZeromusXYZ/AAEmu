@@ -1204,7 +1204,7 @@ public partial class Npc : Unit
         //     // TaskManager.Instance.Schedule(new UnitMove(new Track(), this), TimeSpan.FromMilliseconds(100));
         // }
         AddUnitAggro(AggroKind.Damage, attacker, amount);
-        Ai.OnAggroTargetChanged();
+        Ai?.OnAggroTargetChanged();
 
         /*
         var topAbuser = AggroTable.GetTopTotalAggroAbuserObjId();

@@ -148,13 +148,15 @@ public class CSStartSkillPacket : GamePacket
         }
         else
         {
-            // No idea what this is
-            Logger.Warn($"StartSkill: Id {skillId}, undefined use type");
-            // If it's a valid skill cast it. This fixes interactions with quest items/doodads.
+            // No idea what this is, most likely a reactive skill, but needs to be executed to fix some interactions
+            // TODO: Verify if we are actually able to use this
+
+            Logger.Debug($"StartSkill: Id {skillId}, undefined use type");
             skill = new Skill(SkillManager.Instance.GetSkillTemplate(skillId));
             skillResult = skill.Use(Connection.ActiveChar, skillCaster, skillCastTarget, skillObject, false, out skillResultErrorValue);
         }
-        
+
+        // If skill failed, send an error message
         if (skillResult != SkillResult.Success)
         {
             // It actually sends a skill started packet, but not a skill fired or stopped

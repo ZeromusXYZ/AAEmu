@@ -188,7 +188,9 @@ public class Skill
         {
             Task.Run(() => Template.Plot.RunAsync(caster, casterCaster, target, targetCaster, skillObject, this));
             if (Template.PlotOnly)
+            {
                 return SkillResult.Success;
+            }
         }
 
         // Check if target is within range
@@ -294,7 +296,10 @@ public class Skill
 
         // HACKFIX : Mounts and Turbulence
         if (skillCaster.Type == SkillCasterType.Mount || skillCaster.Type == SkillCasterType.Unit)
+        {
+            var targetCharacter = WorldManager.Instance.GetCharacterByObjId(skillCaster.ObjId);
             target = WorldManager.Instance.GetUnit(skillCaster.ObjId);
+        }
 
         switch (Template.TargetType)
         {

@@ -538,6 +538,19 @@ public class Teleport : ICommand
             AltNames = new string[] { "snake", "snek" }
         });
         #endregion
+        
+        #region debug
+        locations.Add(new TPloc
+        {
+            Region = TeleportCommandRegions.Other,
+            Name = "debug",
+            Info = "Out of Bounds, Flat Empty Testing Area",
+            X = 8192,
+            Y = 6144,
+            Z = 128,
+            AltNames = new string[] { "flatlands" }
+        });
+        #endregion
     }
 
     public void Execute(Character character, string[] args, IMessageOutput messageOutput)

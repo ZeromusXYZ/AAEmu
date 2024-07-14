@@ -28,13 +28,19 @@ public class Plot
         // I am guessing we want to do something here to run it in a thread, or at least using Async
         await Tree.ExecuteAsync(state);
 
-        if (casterCaster is SkillItem skillItem && caster is Character player && skillItem.SkillSourceItem != null)
+        var player = (caster as Character);
+        if (player != null && casterCaster is SkillItem skillItem && skillItem.SkillSourceItem != null)
         {
             // Trigger item use if not cancelled
             if (!state.CancellationRequested())
                 player.ItemUse(skillItem.SkillSourceItem);
             // Free the item from lock
             player.SendPacket(new SCItemTaskSuccessPacket(ItemTaskType.ItemUnlock, new ItemUpdate(skillItem.SkillSourceItem), []));
+        }
+
+        if (player != null && state.CancellationRequested())
+        {
+            player.SendPacket(new SCSkillStoppedPacket(player.ObjId, skill.Template.Id));
         }
     }
 }
