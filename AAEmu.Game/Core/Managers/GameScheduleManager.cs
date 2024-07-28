@@ -16,12 +16,8 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
     private bool _loaded = false;
-    private Dictionary<int, GameSchedules> _gameSchedules; // GameScheduleId, GameSchedules
-    private Dictionary<int, GameScheduleSpawners> _gameScheduleSpawners;
     private Dictionary<int, List<int>> _gameScheduleSpawnerIds;
-    private Dictionary<int, GameScheduleDoodads> _gameScheduleDoodads;
     private Dictionary<int, List<int>> _gameScheduleDoodadIds;
-    private Dictionary<int, GameScheduleQuests> _gameScheduleQuests;
     private List<int> GameScheduleId { get; set; }
 
     public void Load()
@@ -38,31 +34,6 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         Logger.Info("Loaded schedules");
 
         _loaded = true;
-    }
-
-    public void LoadGameSchedules(Dictionary<int, GameSchedules> gameSchedules)
-    {
-        //_gameSchedules = new Dictionary<int, GameSchedules>();
-        //foreach (var gs in gameSchedules)
-        //{
-        //    _gameSchedules.TryAdd(gs.Key, gs.Value);
-        //}
-        _gameSchedules = gameSchedules;
-    }
-
-    public void LoadGameScheduleSpawners(Dictionary<int, GameScheduleSpawners> gameScheduleSpawners)
-    {
-        _gameScheduleSpawners = gameScheduleSpawners;
-    }
-
-    public void LoadGameScheduleDoodads(Dictionary<int, GameScheduleDoodads> gameScheduleDoodads)
-    {
-        _gameScheduleDoodads = gameScheduleDoodads;
-    }
-
-    public void LoadGameScheduleQuests(Dictionary<int, GameScheduleQuests> gameScheduleQuests)
-    {
-        _gameScheduleQuests = gameScheduleQuests;
     }
 
     public bool CheckSpawnerInScheduleSpawners(int spawnerId)
@@ -104,7 +75,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         var res = false;
         foreach (var gameScheduleId in _gameScheduleSpawnerIds[spawnerId])
         {
-            if (_gameSchedules.TryGetValue(gameScheduleId, out var gs))
+            if (SchedulesGameData.Instance.GameSchedules.TryGetValue(gameScheduleId, out var gs))
             {
                 res = true;
             }
@@ -118,7 +89,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         var res = false;
         foreach (var gameScheduleId in _gameScheduleDoodadIds[doodadId])
         {
-            if (_gameSchedules.TryGetValue(gameScheduleId, out var gs))
+            if (SchedulesGameData.Instance.GameSchedules.TryGetValue(gameScheduleId, out var gs))
             {
                 res = true;
             }
@@ -132,7 +103,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         var res = new List<bool>();
         foreach (var gameScheduleId in _gameScheduleDoodadIds[doodadId])
         {
-            if (_gameSchedules.TryGetValue(gameScheduleId, out var gs))
+            if (SchedulesGameData.Instance.GameSchedules.TryGetValue(gameScheduleId, out var gs))
             {
                 res.Add(CheckData(gs));
             }
@@ -146,7 +117,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         var res = new List<bool>();
         foreach (var gameScheduleId in _gameScheduleSpawnerIds[spawnerId])
         {
-            if (_gameSchedules.TryGetValue(gameScheduleId, out var gs))
+            if (SchedulesGameData.Instance.GameSchedules.TryGetValue(gameScheduleId, out var gs))
             {
                 res.Add(CheckData(gs));
             }
@@ -160,7 +131,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
         var res = new List<bool>();
         foreach (var gameScheduleId in GameScheduleId)
         {
-            if (_gameSchedules.TryGetValue(gameScheduleId, out var gs))
+            if (SchedulesGameData.Instance.GameSchedules.TryGetValue(gameScheduleId, out var gs))
             {
                 res.Add(CheckData(gs));
             }
@@ -179,9 +150,9 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 
         foreach (var gameScheduleId in _gameScheduleSpawnerIds[spawnerId])
         {
-            if (!_gameSchedules.ContainsKey(gameScheduleId)) { continue; }
+            if (!SchedulesGameData.Instance.GameSchedules.ContainsKey(gameScheduleId)) { continue; }
 
-            var gameSchedules = _gameSchedules[gameScheduleId];
+            var gameSchedules = SchedulesGameData.Instance.GameSchedules[gameScheduleId];
 
             cronExpression = start ? GetCronExpression(gameSchedules, true) : GetCronExpression(gameSchedules, false);
         }
@@ -199,9 +170,9 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 
         foreach (var gameScheduleId in _gameScheduleDoodadIds[doodadId])
         {
-            if (!_gameSchedules.ContainsKey(gameScheduleId)) { continue; }
+            if (!SchedulesGameData.Instance.GameSchedules.ContainsKey(gameScheduleId)) { continue; }
 
-            var gameSchedules = _gameSchedules[gameScheduleId];
+            var gameSchedules = SchedulesGameData.Instance.GameSchedules[gameScheduleId];
 
             cronExpression = start ? GetCronExpression(gameSchedules, true) : GetCronExpression(gameSchedules, false);
         }
@@ -220,9 +191,9 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 
         foreach (var gameScheduleId in _gameScheduleSpawnerIds[spawnerId])
         {
-            if (!_gameSchedules.ContainsKey(gameScheduleId)) { continue; }
+            if (!SchedulesGameData.Instance.GameSchedules.ContainsKey(gameScheduleId)) { continue; }
 
-            var gameSchedules = _gameSchedules[gameScheduleId];
+            var gameSchedules = SchedulesGameData.Instance.GameSchedules[gameScheduleId];
             var timeSpan = start ? GetRemainingTimeStart(gameSchedules) : GetRemainingTimeEnd(gameSchedules);
             if (timeSpan <= remainingTime)
             {
@@ -235,14 +206,14 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 
     public bool HasGameScheduleSpawnersData(uint spawnerTemplateId)
     {
-        return _gameScheduleSpawners.Values.Any(gss => gss.SpawnerId == spawnerTemplateId);
+        return SchedulesGameData.Instance.GameScheduleSpawners.Values.Any(gss => gss.SpawnerId == spawnerTemplateId);
     }
 
     private void LoadGameScheduleSpawnersData()
     {
         // Spawners
         _gameScheduleSpawnerIds = new Dictionary<int, List<int>>();
-        foreach (var gss in _gameScheduleSpawners.Values)
+        foreach (var gss in SchedulesGameData.Instance.GameScheduleSpawners.Values)
         {
             if (!_gameScheduleSpawnerIds.ContainsKey(gss.SpawnerId))
             {
@@ -256,7 +227,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
 
         // Doodads
         _gameScheduleDoodadIds = new Dictionary<int, List<int>>();
-        foreach (var gsd in _gameScheduleDoodads.Values)
+        foreach (var gsd in SchedulesGameData.Instance.GameScheduleDoodads.Values)
         {
             if (!_gameScheduleDoodadIds.ContainsKey(gsd.DoodadId))
             {
@@ -273,7 +244,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
     public bool GetGameScheduleDoodadsData(uint doodadId)
     {
         GameScheduleId = new List<int>();
-        foreach (var gsd in _gameScheduleDoodads.Values)
+        foreach (var gsd in SchedulesGameData.Instance.GameScheduleDoodads.Values)
         {
             if (gsd.DoodadId != doodadId) { continue; }
             GameScheduleId.Add(gsd.GameScheduleId);
@@ -284,7 +255,7 @@ public class GameScheduleManager : Singleton<GameScheduleManager>
     public bool GetGameScheduleQuestsData(uint questId)
     {
         GameScheduleId = new List<int>();
-        foreach (var gsq in _gameScheduleQuests.Values)
+        foreach (var gsq in SchedulesGameData.Instance.GameScheduleQuests.Values)
         {
             if (gsq.QuestId != questId) { continue; }
             GameScheduleId.Add(gsq.GameScheduleId);

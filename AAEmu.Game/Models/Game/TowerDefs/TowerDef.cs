@@ -17,5 +17,5 @@ public class TowerDef
     // TitleMsg
     // MilestoneId
 
-    public List<TowerDefProg> Progs;
+    public List<TowerDefProg> Progs { get; set; }
 }

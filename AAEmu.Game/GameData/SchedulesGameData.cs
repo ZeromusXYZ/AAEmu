@@ -15,17 +15,17 @@ namespace AAEmu.Game.GameData;
 [GameData]
 public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
 {
-    private Dictionary<int, GameSchedules> _gameSchedules;
-    private Dictionary<int, GameScheduleSpawners> _gameScheduleSpawners;
-    private Dictionary<int, GameScheduleDoodads> _gameScheduleDoodads;
-    private Dictionary<int, GameScheduleQuests> _gameScheduleQuests;
+    public Dictionary<int, GameSchedules> GameSchedules { get; set; }
+    public Dictionary<int, GameScheduleSpawners> GameScheduleSpawners { get; set; }
+    public Dictionary<int, GameScheduleDoodads> GameScheduleDoodads { get; set; }
+    public Dictionary<int, GameScheduleQuests> GameScheduleQuests { get; set; }
 
     public void Load(SqliteConnection connection)
     {
-        _gameSchedules = new Dictionary<int, GameSchedules>();
-        _gameScheduleSpawners = new Dictionary<int, GameScheduleSpawners>();
-        _gameScheduleDoodads = new Dictionary<int, GameScheduleDoodads>();
-        _gameScheduleQuests = new Dictionary<int, GameScheduleQuests>();
+        GameSchedules = new Dictionary<int, GameSchedules>();
+        GameScheduleSpawners = new Dictionary<int, GameScheduleSpawners>();
+        GameScheduleDoodads = new Dictionary<int, GameScheduleDoodads>();
+        GameScheduleQuests = new Dictionary<int, GameScheduleQuests>();
 
         using (var command = connection.CreateCommand())
         {
@@ -62,7 +62,7 @@ public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
                     template.EdMin = reader.GetInt32("ed_min");
                     template.StartTimeMin = reader.GetInt32("start_time_min");
                     template.EndTimeMin = reader.GetInt32("end_time_min");
-                    _gameSchedules.TryAdd(template.Id, template);
+                    GameSchedules.TryAdd(template.Id, template);
                 }
             }
         }
@@ -81,7 +81,7 @@ public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
                     template.GameScheduleId = reader.GetInt32("game_schedule_id");
                     template.SpawnerId = reader.GetInt32("spawner_id");
 
-                    _gameScheduleSpawners.TryAdd(template.Id, template);
+                    GameScheduleSpawners.TryAdd(template.Id, template);
                 }
             }
         }
@@ -99,7 +99,7 @@ public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
                     template.GameScheduleId = reader.GetInt32("game_schedule_id");
                     template.DoodadId = reader.GetInt32("doodad_id");
 
-                    _gameScheduleDoodads.TryAdd(template.Id, template);
+                    GameScheduleDoodads.TryAdd(template.Id, template);
                 }
             }
         }
@@ -117,7 +117,7 @@ public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
                     template.GameScheduleId = reader.GetInt32("game_schedule_id");
                     template.QuestId = reader.GetInt32("quest_id");
 
-                    _gameScheduleQuests.TryAdd(template.Id, template);
+                    GameScheduleQuests.TryAdd(template.Id, template);
                 }
             }
         }
@@ -125,9 +125,6 @@ public class SchedulesGameData : Singleton<SchedulesGameData>, IGameDataLoader
 
     public void PostLoad()
     {
-        GameScheduleManager.Instance.LoadGameSchedules(_gameSchedules);
-        GameScheduleManager.Instance.LoadGameScheduleSpawners(_gameScheduleSpawners);
-        GameScheduleManager.Instance.LoadGameScheduleDoodads(_gameScheduleDoodads);
-        GameScheduleManager.Instance.LoadGameScheduleQuests(_gameScheduleQuests);
+        //
     }
 }

@@ -35,12 +35,12 @@ public class NpcSpawner : Spawner<Npc>
     [DefaultValue(1f)]
     public uint Count { get; set; }
     public List<uint> NpcSpawnerIds { get; set; }
-    private bool _isScheduled { get; set; }
+    private bool IsScheduled { get; set; }
     public NpcSpawnerTemplate Template { get; set; } // npcSpawnerId(NpcSpawnerTemplateId), template
 
     public NpcSpawner()
     {
-        _isScheduled = false; // Npc isn't on the schedule
+        IsScheduled = false; // Npc isn't on the schedule
         _spawned = new List<Npc>();
         Count = 1;
         NpcSpawnerIds = new List<uint>();
@@ -272,7 +272,7 @@ public class NpcSpawner : Spawner<Npc>
             //_lastSpawn.Spawner = this;
         }
 
-        if (_isScheduled)
+        if (IsScheduled)
         {
             DoDespawnSchedule(_lastSpawn, all);
         }
@@ -326,9 +326,9 @@ public class NpcSpawner : Spawner<Npc>
         }
 
         #region Schedule
-        _isScheduled = false;
+        IsScheduled = false;
         // Check if Time Of Day matches Template.StartTime or Template.EndTime
-        if (Template.StartTime > 0.0f | Template.EndTime > 0.0f)
+        if (Template.StartTime > 0.0f || Template.EndTime > 0.0f)
         {
             var curTime = TimeManager.Instance.GetTime;
             if (!TimeSpan.FromHours(curTime).IsBetween(TimeSpan.FromHours(Template.StartTime), TimeSpan.FromHours(Template.EndTime)))
@@ -345,7 +345,7 @@ public class NpcSpawner : Spawner<Npc>
                 {
                     delay = 5f;
                 }
-                _isScheduled = true; // Npc is on the schedule
+                IsScheduled = true; // Npc is on the schedule
                 TaskManager.Instance.Schedule(new NpcSpawnerDoSpawnTask(this), TimeSpan.FromSeconds(delay));
                 // Reschedule when OK
                 return true;
@@ -363,7 +363,7 @@ public class NpcSpawner : Spawner<Npc>
                 var inGameSchedule = GameScheduleManager.Instance.CheckSpawnerInGameSchedules((int)Template.Id);
                 if (inGameSchedule)
                 {
-                    _isScheduled = true; // Npc is on the schedule
+                    IsScheduled = true; // Npc is on the schedule
                     // период уже начался
                     // period has already started
                     var alreadyBegun = GameScheduleManager.Instance.PeriodHasAlreadyBegunNpc((int)Template.Id);
@@ -378,7 +378,7 @@ public class NpcSpawner : Spawner<Npc>
                         {
                             Logger.Warn($"DoSpawnSchedule: Can't reschedule spawn Npc {UnitId} from spawnerId {Template.Id}");
                             Logger.Warn($"DoSpawnSchedule: cronExpression {cronExpression}");
-                            _isScheduled = false;
+                            IsScheduled = false;
                             return false;
                         }
 
@@ -390,7 +390,7 @@ public class NpcSpawner : Spawner<Npc>
                         {
                             Logger.Warn($"DoSpawnSchedule: Can't reschedule spawn Npc {UnitId} from spawnerId {Template.Id}");
                             Logger.Warn($"DoSpawnSchedule: cronExpression {cronExpression}");
-                            _isScheduled = false;
+                            IsScheduled = false;
                             return false;
                         }
 
