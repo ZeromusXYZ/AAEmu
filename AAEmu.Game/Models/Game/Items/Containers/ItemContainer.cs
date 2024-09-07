@@ -956,7 +956,9 @@ public class ItemContainer
 
     public virtual void OnEnterContainer(Item item, ItemContainer lastContainer, byte previousSlot)
     {
-        // Do nothing
+        item._holdingContainer = this;
+        item.OwnerId = OwnerId;
+        item.SlotType = ContainerType;
     }
 
     public virtual void OnLeaveContainer(Item item, ItemContainer newContainer, byte previousSlot)

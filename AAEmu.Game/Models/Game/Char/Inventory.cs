@@ -618,7 +618,7 @@ public class Inventory
         }
 
         // Force-assign item owners for safety
-        if (fromItem != null)
+        if ((fromItem != null) && (fromItem._holdingContainer != null))
             fromItem.OwnerId = sourceContainer?.OwnerId ?? 0;
         if (itemInTargetSlot != null)
             itemInTargetSlot.OwnerId = targetContainer?.OwnerId ?? 0;
