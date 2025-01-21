@@ -171,9 +171,7 @@ public class NpcGameData : Singleton<NpcGameData>, IGameDataLoader
 
     public List<uint> GetSpawnerIds(uint memberId)
     {
-        _npcMemberAndSpawnerTemplateIds.TryGetValue(memberId, out var list);
-
-        return list;
+        return _npcMemberAndSpawnerTemplateIds.GetValueOrDefault(memberId);
     }
 
     public NpcSpawnerTemplate GetNpcSpawnerTemplate(uint npcSpawnerTemplateId)

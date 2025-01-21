@@ -153,8 +153,10 @@ public class SpawnManager : Singleton<SpawnManager>
                 // TODO добавил список спавнеров // added a list of spawners
                 foreach (var id in npcSpawnerIds)
                 {
-                    var spawner = NpcSpawner.Clone(npcSpawner);
                     var template = NpcGameData.Instance.GetNpcSpawnerTemplate(id);
+                    //if (npcSpawnerIds.Count > 1 && template.NpcSpawnerCategoryId != NpcSpawnerCategory.Normal)
+                    //    continue;
+                    var spawner = NpcSpawner.Clone(npcSpawner);
                     spawner.InitializeSpawnableNpcs(template);
                     spawner.NpcSpawnerIds.Add(id);
                     spawner.Id = _nextId;
@@ -339,6 +341,9 @@ public class SpawnManager : Singleton<SpawnManager>
             return;
         }
         npcFiles = ReverseSpawnFiles(npcFiles);
+        
+        // Populate all spawn locations from the files
+        var npcSpawnNodes = new Dictionary<uint, NpcSpawner>();
         foreach (var jsonFileName in npcFiles)
         {
             if (!File.Exists(jsonFileName))
@@ -354,11 +359,12 @@ public class SpawnManager : Singleton<SpawnManager>
             }
             if (JsonHelper.TryDeserializeObject(contents, out List<NpcSpawner> npcSpawnersFromFile, out _))
             {
-                var entry = 0;
+                var entry = 0u;
                 foreach (var npcSpawnerFromFile in npcSpawnersFromFile)
                 {
                     entry++;
-
+                    
+                    /*
                     // Check for duplication by UnitId and Position
                     if (_npcSpawners[(byte)world.Id].Values
                         .SelectMany(spawners => spawners)
@@ -370,6 +376,7 @@ public class SpawnManager : Singleton<SpawnManager>
                         Logger.Trace($"Duplicate NPC spawner found in {jsonFileName} (UnitId: {npcSpawnerFromFile.UnitId}, Position: {npcSpawnerFromFile.Position})");
                         continue;
                     }
+                    */
                     if (!NpcManager.Instance.Exist(npcSpawnerFromFile.UnitId))
                     {
                         Logger.Trace($"Npc Template {npcSpawnerFromFile.UnitId} (file entry {entry}) doesn't exist - {jsonFileName}");
@@ -380,13 +387,19 @@ public class SpawnManager : Singleton<SpawnManager>
                     npcSpawnerFromFile.Position.Yaw = npcSpawnerFromFile.Position.Yaw.DegToRad();
                     npcSpawnerFromFile.Position.Pitch = npcSpawnerFromFile.Position.Pitch.DegToRad();
                     npcSpawnerFromFile.Position.Roll = npcSpawnerFromFile.Position.Roll.DegToRad();
-                    AddNpcSpawner(npcSpawnerFromFile);
+                    npcSpawnNodes.Add(entry, npcSpawnerFromFile);
+                    // AddNpcSpawner(npcSpawnerFromFile);
                 }
             }
             else
             {
                 throw new GameException($"SpawnManager: Parse {jsonFileName} file");
             }
+        }
+
+        foreach (var (spawnNodeId, spawnNode) in npcSpawnNodes)
+        {
+            AddNpcSpawner(spawnNode);
         }
     }
 
