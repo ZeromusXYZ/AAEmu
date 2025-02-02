@@ -149,7 +149,7 @@ public class IdManager
         return result;
     }
 
-    public void ReleaseId(uint usedObjectId)
+    public virtual void ReleaseId(uint usedObjectId)
     {
         lock (_lock)
         {

@@ -15,4 +15,9 @@ public class ObjectIdManager : IdManager
     public ObjectIdManager() : base("ObjectIdManager", FirstId, LastId, ObjTables, Exclude)
     {
     }
+
+    public override void ReleaseId(uint usedObjectId)
+    {
+        return;
+    }
 }
