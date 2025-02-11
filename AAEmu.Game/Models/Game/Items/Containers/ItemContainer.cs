@@ -9,6 +9,7 @@ using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Core.Network.Game;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models.Game.Char;
+using AAEmu.Game.Models.Game.Chat;
 using AAEmu.Game.Models.Game.Items.Actions;
 using AAEmu.Game.Models.Game.Items.Templates;
 using AAEmu.Game.Models.Game.Units;
@@ -446,6 +447,7 @@ public class ItemContainer
             Owner?.Inventory.OnConsumedItem(item, item.Count);
         }
 
+        DebugCheckForSlotErrors("AddOrMoveExistingItem");
         return itemTasks.Count + sourceItemTasks.Count > 0;
     }
 
@@ -757,6 +759,7 @@ public class ItemContainer
             }
         }
 
+        DebugCheckForSlotErrors("AcquireDefaultItemEx");
         return itemTasks.Count > 0;
     }
 
@@ -946,10 +949,56 @@ public class ItemContainer
     public virtual void OnEnterContainer(Item item, ItemContainer lastContainer, byte previousSlot)
     {
         // Do nothing
+        if (OwnerId > 0)
+        {
+            item.OwnerId = OwnerId;
+        }
+        item._holdingContainer = this;
+        DebugCheckForSlotErrors("OnEnterContainer");
     }
 
     public virtual void OnLeaveContainer(Item item, ItemContainer newContainer, byte previousSlot)
     {
         // Do Nothing
+        DebugCheckForSlotErrors("OnLeaveContainer");
+    }
+
+    private void DebugCheckForSlotErrors(string title)
+    {
+        // Don't check on "infinite size" containers
+        if (ContainerSize <= 0 || ContainerSize >= 9999)
+            return;
+        
+        // Skip NPCs
+        if (OwnerId <= 0 || ContainerId <= 0)
+            return;
+
+        // First check for slot number errors
+        var usedSlots = new List<int>();
+        foreach (var item in Items)
+        {
+            if (usedSlots.Contains(item.Slot))
+            {
+                var errorString = $"[{title}]: {ContainerType} {ContainerId} Slot {item.Slot} for item {item.TemplateId} ({item.Id}) has already been used by the container, Item Owner {item.OwnerId}, Container Owner {OwnerId}."; 
+                Logger.Error(errorString + $"\n{Environment.StackTrace}");
+                Owner?.SendMessage(ChatType.System2, errorString);
+                continue;
+            }
+            usedSlots.Add(item.Slot);
+        }
+        
+        // Second check for duplicate item Ids
+        var usedItemIds = new List<ulong>();
+        foreach (var item in Items)
+        {
+            if (usedItemIds.Contains(item.Id))
+            {
+                var errorString = $"[{title}]: {ContainerType} {ContainerId} Item {item.TemplateId} ({item.Id}) in slot {item.Slot} has already been used inside the container, Item Owner {item.OwnerId}, Container Owner {OwnerId}."; 
+                Logger.Error(errorString + $"\n{Environment.StackTrace}");
+                Owner?.SendMessage(ChatType.System2, errorString);
+                continue;
+            }
+            usedItemIds.Add(item.Id);
+        }
     }
 }
