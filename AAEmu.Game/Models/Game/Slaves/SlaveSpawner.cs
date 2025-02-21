@@ -27,7 +27,7 @@ public class SlaveSpawner : Spawner<Slave>
         _lastSpawn = new Slave();
     }
 
-    public override Slave Spawn(uint objId)
+    public override Slave Spawn()
     {
         DoSpawn();
         return _lastSpawn;

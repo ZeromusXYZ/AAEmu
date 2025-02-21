@@ -97,7 +97,7 @@ public class PlotTargetInfo
     private BaseUnit UpdateAreaTarget(PlotTargetAreaParams args, PlotState state, PlotEventTemplate plotEvent)
     {
         var posUnit = new BaseUnit();
-        posUnit.ObjId = uint.MaxValue;
+        // posUnit.ObjId = uint.MaxValue;
         posUnit.Region = PreviousTarget.Region;
         posUnit.Transform = PreviousTarget.Transform.CloneDetached(posUnit);
         var degrees = (float)(args.Angle);
@@ -170,7 +170,7 @@ public class PlotTargetInfo
     private BaseUnit UpdateRandomAreaTarget(PlotTargetRandomAreaParams args, PlotState state, PlotEventTemplate plotEvent)
     {
         var posUnit = new BaseUnit();
-        posUnit.ObjId = uint.MaxValue;
+        // posUnit.ObjId = uint.MaxValue;
         posUnit.Region = PreviousTarget.Region;
         posUnit.Transform = PreviousTarget.Transform.CloneDetached(posUnit);
         posUnit.Transform.ZoneId = PreviousTarget.Transform.ZoneId;

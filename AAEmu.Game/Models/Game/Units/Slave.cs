@@ -723,7 +723,7 @@ public class Slave : Unit
                         var newDoodadId = putDownBackpackEffectTemplate.BackpackDoodadId;
 
                         // Create the Doodad at location on the floor if it's close to it
-                        var newDoodad = DoodadManager.Instance.Create(0, newDoodadId, null, true);
+                        var newDoodad = DoodadManager.Instance.Create(newDoodadId, null, true);
                         if (newDoodad == null)
                         {
                             Logger.Warn($"Dropped Doodad {newDoodadId}, from BackpackDoodadId could not be created");
@@ -798,7 +798,7 @@ public class Slave : Unit
         {
             for (var counter = 0; counter < dropDoodad.Count; counter++)
             {
-                var doodad = DoodadManager.Instance.Create(0, dropDoodad.DoodadId, null, true);
+                var doodad = DoodadManager.Instance.Create(dropDoodad.DoodadId, null, true);
                 var pos = Transform.World.Position;
                 var rng = new Vector3((Random.Shared.NextSingle() * 2f) - 1f, (Random.Shared.NextSingle() * 2f) - 1f, 0);
                 rng = Vector3.Normalize(rng);

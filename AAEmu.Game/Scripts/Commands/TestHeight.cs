@@ -78,7 +78,7 @@ public class TestHeight : ICommand
                     doodadSpawner.Position.Yaw = 0;
                     doodadSpawner.Position.Pitch = 0;
                     doodadSpawner.Position.Roll = 0;
-                    doodadSpawner.Spawn(0);
+                    doodadSpawner.Spawn();
                 }
         }
         else if (args.Length > firstarg && args[firstarg] == "line")
@@ -110,7 +110,7 @@ public class TestHeight : ICommand
                 doodadSpawner.Position.Yaw = 0;
                 doodadSpawner.Position.Pitch = 0;
                 doodadSpawner.Position.Roll = 0;
-                doodadSpawner.Spawn(0);
+                doodadSpawner.Spawn();
             }
 
             for (var y = rY - 10f; y <= rY + 10f; y += 1f)
@@ -131,7 +131,7 @@ public class TestHeight : ICommand
                 doodadSpawner.Position.Yaw = 0;
                 doodadSpawner.Position.Pitch = 0;
                 doodadSpawner.Position.Roll = 0;
-                doodadSpawner.Spawn(0);
+                doodadSpawner.Spawn();
             }
         }
         else

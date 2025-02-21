@@ -52,7 +52,7 @@ public class DoodadFuncFinalTask : DoodadFuncTask
             var world = WorldManager.Instance.GetWorld(_owner.Transform.WorldId);
             //_owner.Spawner.DecreaseCount(_owner);
             _owner.Spawner.Position.WorldId = world.Id;
-            _owner.Spawner.Spawn(0);
+            _owner.Spawner.Spawn();
         }
         else
         {

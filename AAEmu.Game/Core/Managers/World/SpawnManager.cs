@@ -735,7 +735,7 @@ public class SpawnManager : Singleton<SpawnManager>
                     var data = reader.GetInt32("data");
                     var farmType = (FarmType)reader.GetUInt32("farm_type");
 
-                    var doodad = DoodadManager.Instance.Create(0, templateId, null, true);
+                    var doodad = DoodadManager.Instance.Create(templateId, null, true);
 
                     //doodad.Spawner = new DoodadSpawner();
                     //doodad.Spawner.UnitId = templateId;
@@ -863,7 +863,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 var count = 0;
                 foreach (var spawner in worldSpawners.Values)
                 {
-                    spawner.Spawn(0);
+                    spawner.Spawn();
                     count++;
                     if (count % 1000 == 0 && worldId == 0)
                     {
@@ -906,7 +906,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 var count = 0;
                 foreach (var spawner in worldSpawners.Values)
                 {
-                    spawner.Spawn(0);
+                    spawner.Spawn();
                     count++;
                     if (count % 5 == 0 && worldId == 0)
                     {
@@ -926,7 +926,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 var count = 0;
                 foreach (var spawner in worldSpawners.Values)
                 {
-                    spawner.Spawn(0);
+                    spawner.Spawn();
                     count++;
                     if (count % 5 == 0 && worldId == 0)
                     {
@@ -949,7 +949,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 }
                 else
                 {
-                    if (doodad.Spawner?.Spawn(doodad.ObjId) == null)
+                    if (doodad.Spawner?.Spawn() == null)
                         Logger.Error($"Failed to spawn player doodad DbId:{doodad.DbId}, TemplateId: {doodad.TemplateId}");
                 }
             }
@@ -969,7 +969,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 {
                     spawner.Position.WorldId = worldId;
                     spawner.ClearSpawnCount();
-                    npcList.Add(spawner.Spawn(0));
+                    npcList.Add(spawner.Spawn());
                     spawner.Position.WorldId = worldTemplateId;
                 }
             }
@@ -982,7 +982,7 @@ public class SpawnManager : Singleton<SpawnManager>
             foreach (var spawner in doodadSpawners.Values)
             {
                 spawner.Position.WorldId = worldId;
-                spawner.Spawn(0);
+                spawner.Spawn();
                 spawner.Position.WorldId = worldTemplateId;
             }
             //});
@@ -994,7 +994,7 @@ public class SpawnManager : Singleton<SpawnManager>
             foreach (var spawner in slaveSpawners.Values)
             {
                 spawner.Position.WorldId = worldId;
-                spawner.Spawn(0);
+                spawner.Spawn();
                 spawner.Position.WorldId = worldTemplateId;
             }
             //});
@@ -1006,7 +1006,7 @@ public class SpawnManager : Singleton<SpawnManager>
             foreach (var spawner in gimmickSpawners.Values)
             {
                 spawner.Position.WorldId = worldId;
-                spawner.Spawn(0);
+                spawner.Spawn();
                 spawner.Position.WorldId = worldTemplateId;
             }
             //});
@@ -1025,7 +1025,7 @@ public class SpawnManager : Singleton<SpawnManager>
                 {
                     if (source.Transform.World.Position.Y - spawner.Position.Y < range)
                     {
-                        spawner.Spawn(0);
+                        spawner.Spawn();
                     }
                 }
             }
@@ -1040,7 +1040,7 @@ public class SpawnManager : Singleton<SpawnManager>
                     {
                         if (source.Transform.World.Position.Y - spawner.Position.Y < range)
                         {
-                            spawner.Spawn(0);
+                            spawner.Spawn();
                         }
                     }
                 }

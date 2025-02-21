@@ -25,7 +25,7 @@ public class NpcSpawnerNpc : Spawner<Npc>
     }
 
     /// <summary>
-    /// Creates a new instance of NpcSpawnerNpcs with a Spawner template id (npc_spanwers)
+    /// Creates a new instance of NpcSpawnerNpcs with a Spawner template id (npc_spawners)
     /// </summary>
     /// <param name="spawnerTemplateId"></param>
     public NpcSpawnerNpc(uint spawnerTemplateId)
@@ -56,7 +56,7 @@ public class NpcSpawnerNpc : Spawner<Npc>
     private List<Npc> SpawnNpc(NpcSpawner npcSpawner, uint ownerID = 0)
     {
         var npcs = new List<Npc>();
-        var npc = NpcManager.Instance.Create(0, MemberId);
+        var npc = NpcManager.Instance.Create(MemberId);
         if (npc == null)
         {
             Logger.Warn($"Npc {MemberId}, from spawner Id {npcSpawner.Id} not exist at db. Spawner Position: {npcSpawner.Position}");

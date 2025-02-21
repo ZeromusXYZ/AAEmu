@@ -132,9 +132,9 @@ public class GimmickSpawner : Spawner<Gimmick>
         Count = 1;
     }
 
-    public override Gimmick Spawn(uint objId)
+    public override Gimmick Spawn()
     {
-        var gimmick = GimmickManager.Instance.Create(objId, UnitId, this);
+        var gimmick = GimmickManager.Instance.Create(UnitId, this);
         if (gimmick == null)
         {
             Logger.Warn("Gimmick {0}, from spawn not exist at db", UnitId);

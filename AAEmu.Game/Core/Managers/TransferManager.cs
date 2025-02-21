@@ -150,7 +150,7 @@ public class TransferManager : Singleton<TransferManager>
         return null;
     }*/
 
-    public Transfer Create(uint objectId, uint templateId, TransferSpawner spawner)
+    public Transfer Create(uint templateId, TransferSpawner spawner)
     {
         /*
         * A sequence of packets when a cart appears:
@@ -170,7 +170,7 @@ public class TransferManager : Singleton<TransferManager>
         var carriage = GetTransferTemplate(templateId); // 6 - Salislead Peninsula ~ Liriot Hillside Loop Carriage
         owner.Name = carriage.Name;
         owner.TlId = (ushort)TlIdManager.Instance.GetNextId();
-        owner.ObjId = objectId == 0 ? ObjectIdManager.Instance.GetNextId() : objectId;
+        // owner.ObjId = objectId == 0 ? ObjectIdManager.Instance.GetNextId() : objectId;
         owner.OwnerId = 255;
         owner.Spawner = spawner;
         owner.TemplateId = carriage.Id;
@@ -204,7 +204,7 @@ public class TransferManager : Singleton<TransferManager>
         var transfer = new Transfer();
         transfer.Name = boardingPart.Name;
         transfer.TlId = owner.TlId; // (ushort)TlIdManager.Instance.GetNextId();
-        transfer.ObjId = ObjectIdManager.Instance.GetNextId();
+        // transfer.ObjId = ObjectIdManager.Instance.GetNextId();
         transfer.OwnerId = owner.ObjId;
         transfer.Spawner = owner.Spawner;
         transfer.TemplateId = boardingPart.Id;
@@ -243,7 +243,7 @@ public class TransferManager : Singleton<TransferManager>
 
         foreach (var doodadBinding in transfer.Template.TransferBindingDoodads)
         {
-            var doodad = DoodadManager.Instance.Create(0, doodadBinding.DoodadId, transfer);
+            var doodad = DoodadManager.Instance.Create(doodadBinding.DoodadId, transfer);
             doodad.Transform.StickyParent = null;
             doodad.Transform.Parent = transfer.Transform;
             doodad.ParentObjId = transfer.ObjId;

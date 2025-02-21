@@ -46,7 +46,7 @@ public class GimmickManager : Singleton<GimmickManager>
     /// <param name="templateId"></param>
     /// <param name="spawner"></param>
     /// <returns></returns>
-    public Gimmick Create(uint objectId, uint templateId, GimmickSpawner spawner)
+    public Gimmick Create(uint templateId, GimmickSpawner spawner)
     {
         /*
          * for elevators: templateId=0 and Template=null, but EntityGuid is used
@@ -69,7 +69,7 @@ public class GimmickManager : Singleton<GimmickManager>
             gimmick.EntityGuid = spawner.EntityGuid;
         }
 
-        gimmick.ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId();
+        // gimmick.ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId();
         gimmick.GimmickId = (ushort)GimmickIdManager.Instance.GetNextId();
         gimmick.Spawner = spawner;
         gimmick.TemplateId = templateId;
@@ -130,7 +130,7 @@ public class GimmickManager : Singleton<GimmickManager>
         if (template == null) { return null; }
 
         var gimmick = new Gimmick();
-        gimmick.ObjId = ObjectIdManager.Instance.GetNextId();
+        // gimmick.ObjId = ObjectIdManager.Instance.GetNextId();
         gimmick.GimmickId = (ushort)GimmickIdManager.Instance.GetNextId();
         gimmick.Spawner = new GimmickSpawner();
         gimmick.Template = template;

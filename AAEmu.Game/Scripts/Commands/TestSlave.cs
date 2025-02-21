@@ -34,7 +34,7 @@ public class TestSlave : ICommand
         slave.Summoner = character;
         slave.TemplateId = 73;
         slave.ModelId = 1008;
-        slave.ObjId = ObjectIdManager.Instance.GetNextId();
+        // slave.ObjId = ObjectIdManager.Instance.GetNextId();
         slave.TlId = (ushort)TlIdManager.Instance.GetNextId();
         slave.Faction = FactionManager.Instance.GetFaction((FactionsEnum)143);
         slave.Level = 50;

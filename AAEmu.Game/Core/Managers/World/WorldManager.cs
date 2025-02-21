@@ -703,6 +703,11 @@ public class WorldManager : Singleton<WorldManager>, IWorldManager
         return height;
     }
 
+    /// <summary>
+    /// If the object has a Parent, return its parent
+    /// </summary>
+    /// <param name="obj"></param>
+    /// <returns>Returns the parent if it has one, otherwise returns itself</returns>
     private static GameObject GetRootObj(GameObject obj)
     {
         if (obj.ParentObj == null)
@@ -961,7 +966,7 @@ public class WorldManager : Singleton<WorldManager>, IWorldManager
     {
         if (obj == null)
             return;
-        var region = GetRegion(obj); // Get region of Object or it's Root object if it has one
+        var region = GetRegion(obj); // Get region of the Object or its Root object if it has one
         var currentRegion = obj.Region; // Current Region this object is in
 
         // If region didn't change, ignore

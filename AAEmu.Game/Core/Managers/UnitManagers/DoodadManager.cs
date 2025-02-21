@@ -2776,7 +2776,7 @@ public class DoodadManager : Singleton<DoodadManager>
         return -1;
     }
 
-    public Doodad Create(uint bcId, uint templateId, GameObject ownerObject = null, bool skipPhaseInitialization = false)
+    public Doodad Create(uint templateId, GameObject ownerObject = null, bool skipPhaseInitialization = false)
     {
         if (!_templates.TryGetValue(templateId, out var template))
         {
@@ -2793,7 +2793,7 @@ public class DoodadManager : Singleton<DoodadManager>
 
         doodad ??= new Doodad();
 
-        doodad.ObjId = bcId > 0 ? bcId : ObjectIdManager.Instance.GetNextId();
+        // doodad.ObjId = bcId > 0 ? bcId : ObjectIdManager.Instance.GetNextId();
         doodad.TemplateId = template.Id; // copy the templateId
         doodad.Template = template;
         doodad.OwnerObjId = ownerObject?.ObjId ?? 0;
@@ -2983,7 +2983,7 @@ public class DoodadManager : Singleton<DoodadManager>
         var targetHouse = HousingManager.Instance.GetHouseAtLocation(x, y);
 
         // Create doodad
-        var doodad = Instance.Create(0, id, character, true);
+        var doodad = Instance.Create(id, character, true);
         doodad.IsPersistent = true;
         doodad.Transform = character.Transform.CloneDetached(doodad);
         doodad.Transform.Local.SetPosition(x, y, z);

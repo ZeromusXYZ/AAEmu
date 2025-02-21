@@ -66,7 +66,7 @@ public class PutDownBackpackEffect : EffectTemplate
             // Spawn doodad
             Logger.Debug("PutDownPackEffect");
 
-            var doodad = DoodadManager.Instance.Create(0, BackpackDoodadId, character, true);
+            var doodad = DoodadManager.Instance.Create(BackpackDoodadId, character, true);
             if (doodad == null)
             {
                 Logger.Warn("Doodad {0}, from BackpackDoodadId could not be created", BackpackDoodadId);

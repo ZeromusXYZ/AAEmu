@@ -80,12 +80,12 @@ public class CharacterMates
         var npcId = itemTemplate.NpcId;
         var template = NpcManager.Instance.GetTemplate(npcId);
         var tlId = (ushort)TlIdManager.Instance.GetNextId();
-        var objId = ObjectIdManager.Instance.GetNextId();
+        // var objId = ObjectIdManager.Instance.GetNextId();
         var mateDbInfo = GetMateInfo(skillData.ItemId) ?? CreateNewMate(skillData.ItemId, template);
 
         var mount = new Units.Mate
         {
-            ObjId = objId,
+            // ObjId = objId,
             TlId = tlId,
             OwnerId = Owner.Id,
             Name = mateDbInfo.Name,
@@ -196,7 +196,7 @@ public class CharacterMates
                 command.Connection = connection;
                 command.Transaction = transaction;
 
-                command.CommandText = "DELETE FROM mates WHERE owner = @owner AND id IN(" + string.Join(",", _removedMates) + ")";
+                command.CommandText = $"DELETE FROM mates WHERE owner = @owner AND id IN({string.Join(",", _removedMates)})";
                 command.Parameters.AddWithValue("@owner", Owner.Id);
                 command.Prepare();
                 command.ExecuteNonQuery();

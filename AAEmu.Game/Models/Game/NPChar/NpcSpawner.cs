@@ -188,7 +188,7 @@ public class NpcSpawner : Spawner<Npc>
         {
             if (randomValue < npcTemplate.Weight)
             {
-                var npc = NpcManager.Instance.Create(0, npcTemplate.MemberId);
+                var npc = NpcManager.Instance.Create(npcTemplate.MemberId);
                 if (npc != null)
                 {
                     return npc;
@@ -404,7 +404,7 @@ public class NpcSpawner : Spawner<Npc>
     /// <summary>
     /// Spawns a single NPC with the specified object ID.
     /// </summary>
-    public override Npc Spawn(uint objId)
+    public override Npc Spawn()
     {
         if (IsSpawningScheduleEnabled())
             return null;
@@ -420,7 +420,7 @@ public class NpcSpawner : Spawner<Npc>
     /// <summary>
     /// Force spawns a single NPC with the specified object ID.
     /// </summary>
-    public override Npc ForceSpawn(uint objId)
+    public override Npc ForceSpawn()
     {
         if (SpawnedNpcs.Count == 0)
         {
@@ -664,7 +664,9 @@ public class NpcSpawner : Spawner<Npc>
                 }
 
                 // Creates the NPC
-                var npc = NpcManager.Instance.Create(0, npcTemplate.MemberId);
+#pragma warning disable CA2000
+                var npc = NpcManager.Instance.Create(npcTemplate.MemberId);
+#pragma warning restore CA2000
                 if (npc == null)
                 {
                     Logger.Warn($"Failed to create NPC from template {npcTemplate.SpawnerId}:{npcTemplate.MemberId}");

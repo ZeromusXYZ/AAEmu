@@ -369,7 +369,7 @@ public class SlaveManager : Singleton<SlaveManager>
         if (slaveTemplate == null) return null;
 
         var tlId = (ushort)TlIdManager.Instance.GetNextId();
-        var objId = ObjectIdManager.Instance.GetNextId();
+        // var objId = ObjectIdManager.Instance.GetNextId();
 
         using var spawnPos = positionOverride ?? new Transform(null);
         var spawnOffsetPos = new Vector3();
@@ -526,11 +526,10 @@ public class SlaveManager : Singleton<SlaveManager>
 
         // Create the Slave (packet)
         #region spawn_base_slave
-        owner?.BroadcastPacket(new SCSlaveCreatedPacket(owner.ObjId, tlId, objId, hideSpawnEffect, 0, owner.Name), true);
         var summonedSlave = new Slave
         {
             TlId = tlId,
-            ObjId = objId,
+            // ObjId = objId,
             TemplateId = slaveTemplate.Id,
             Name = string.IsNullOrWhiteSpace(slaveName) ? slaveTemplate.Name : slaveName,
             Level = (byte)slaveTemplate.Level,
@@ -548,6 +547,7 @@ public class SlaveManager : Singleton<SlaveManager>
             OwnerType = owner != null ? BaseUnitType.Character : BaseUnitType.Invalid,
             OwnerId = owner?.Id ?? 0,
         };
+        owner?.BroadcastPacket(new SCSlaveCreatedPacket(owner.ObjId, tlId, summonedSlave.ObjId, hideSpawnEffect, 0, owner.Name), true);
 
         ApplySlaveBonuses(summonedSlave);
 
@@ -603,7 +603,7 @@ public class SlaveManager : Singleton<SlaveManager>
             // Create attached doodad
             var doodad = new Doodad
             {
-                ObjId = ObjectIdManager.Instance.GetNextId(),
+                // ObjId = ObjectIdManager.Instance.GetNextId(),
                 TemplateId = doodadBinding.DoodadId,
                 OwnerObjId = owner?.ObjId ?? 0,
                 ParentObjId = summonedSlave.ObjId,
@@ -690,11 +690,13 @@ public class SlaveManager : Singleton<SlaveManager>
 
             var childSlaveTemplate = GetSlaveTemplate(childSlaveTemplateId > 0 ? childSlaveTemplateId : slaveBinding.SlaveId);
             var childTlId = (ushort)TlIdManager.Instance.GetNextId();
-            var childObjId = ObjectIdManager.Instance.GetNextId();
+            // var childObjId = ObjectIdManager.Instance.GetNextId();
+
+#pragma warning disable CA2000
             var childSlave = new Slave()
             {
                 TlId = childTlId,
-                ObjId = childObjId,
+                // ObjId = childObjId,
                 ParentObj = summonedSlave,
                 TemplateId = childSlaveTemplate.Id,
                 Name = string.IsNullOrWhiteSpace(childSlaveName) ? childSlaveTemplate.Name : childSlaveName,
@@ -713,6 +715,7 @@ public class SlaveManager : Singleton<SlaveManager>
                 OwnerType = BaseUnitType.Slave,
                 OwnerId = summonedSlave.Id,
             };
+#pragma warning restore CA2000
 
             ApplySlaveBonuses(childSlave);
 
@@ -1392,7 +1395,7 @@ value.Yaw);
 
                 var wreckArea = new Doodad
                 {
-                    ObjId = ObjectIdManager.Instance.GetNextId(),
+                    // ObjId = ObjectIdManager.Instance.GetNextId(),
                     TemplateId = healBinding.DoodadId,
                     OwnerObjId = slave.OwnerObjId,
                     ParentObjId = slave.ObjId,

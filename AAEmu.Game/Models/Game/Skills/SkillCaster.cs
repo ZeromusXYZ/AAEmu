@@ -1,6 +1,7 @@
 ﻿using System;
 using AAEmu.Commons.Network;
 using AAEmu.Game.Core.Managers;
+using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Models.Game.Items;
 
 namespace AAEmu.Game.Models.Game.Skills;
@@ -112,6 +113,17 @@ public class SkillItem : SkillCaster
 
     public SkillItem()
     {
+        // Skill Item requires its own fake ObjId
+        ObjId = ObjectIdManager.Instance.GetNextId();
+    }
+
+    ~SkillItem()
+    {
+        if (ObjId <= 0)
+            return;
+
+        ObjectIdManager.Instance.ReleaseId(ObjId);
+        ObjId = 0;
     }
 
     public SkillItem(uint objId, ulong itemId, uint itemTemplateId)

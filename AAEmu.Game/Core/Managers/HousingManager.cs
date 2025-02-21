@@ -89,15 +89,15 @@ public class HousingManager : Singleton<HousingManager>
     /// <param name="objectId"></param>
     /// <param name="tlId"></param>
     /// <returns></returns>
-    private House Create(uint templateId, FactionsEnum factionId, uint objectId = 0, ushort tlId = 0)
+    private House Create(uint templateId, FactionsEnum factionId)
     {
         if (!_housingTemplates.TryGetValue(templateId, out var template))
             return null;
 
         var house = new House
         {
-            TlId = tlId > 0 ? tlId : (ushort)HousingTldManager.Instance.GetNextId(),
-            ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId(),
+            TlId = (ushort)HousingTldManager.Instance.GetNextId(),
+            // ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId(),
             Template = template,
             TemplateId = template.Id, // duplicate Id
             Id = template.Id,
@@ -1322,7 +1322,7 @@ public class HousingManager : Singleton<HousingManager>
                 var yMultiplier = (postId / 2) == 0 ? -1 : 1f;
                 var zRot = ((135f + (90f * postId) % 360)).DegToRad();
 
-                var doodad = DoodadManager.Instance.Create(0, ForSaleMarkerDoodadId, null, true);
+                var doodad = DoodadManager.Instance.Create(ForSaleMarkerDoodadId, null, true);
                 // location
                 doodad.Transform.Local.SetPosition(
                     (house.Template.GardenRadius * xMultiplier) + house.Transform.World.Position.X,
@@ -1716,7 +1716,7 @@ public class HousingManager : Singleton<HousingManager>
         }
         */
 
-        var doodad = DoodadManager.Instance.Create(0, decorationDesign.DoodadId, house, true);
+        var doodad = DoodadManager.Instance.Create(decorationDesign.DoodadId, house, true);
         doodad.Transform.Parent = house.Transform;
         doodad.Transform.Local.SetPosition(pos.X, pos.Y, pos.Z);
         doodad.Transform.Local.ApplyFromQuaternion(quat);

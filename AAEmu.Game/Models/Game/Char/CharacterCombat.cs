@@ -57,7 +57,7 @@ public partial class Character
                 // Spawn doodad
                 Logger.Trace("Spawn tradepack on floor on death");
 
-                var doodad = DoodadManager.Instance.Create(0, backpackDoodadId, this, true);
+                var doodad = DoodadManager.Instance.Create(backpackDoodadId, this, true);
                 if (doodad == null)
                 {
                     Logger.Warn($"Doodad {backpackDoodadId}, from BackpackDoodadId could not be created");

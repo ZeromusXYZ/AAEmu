@@ -46,7 +46,7 @@ public class SpawnGrid : ICommand
             angle.DegToRad(); // TODO: this seems wrong for now, will need to replace with a LookAt() at some later point
         doodadSpawner.Position.Pitch = 0;
         doodadSpawner.Position.Roll = 0;
-        doodadSpawner.Spawn(0);
+        doodadSpawner.Spawn();
         // character.SendMessage(doodadSpawner.Position.ToString());
     }
 

@@ -23,7 +23,7 @@ public class DuelManager : Singleton<DuelManager>
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
 
-    private DoodadSpawner _combatFlag;
+    private DoodadSpawner _combatFlagSpawner;
     private const double Delay = 1000; // 1 sec
     private const float DistanceForSurrender = 75; // square 75 meters
     private const double DuelDurationTime = 5;    // 5 min
@@ -82,17 +82,17 @@ public class DuelManager : Singleton<DuelManager>
                 duel.Challenged.IsInDuel = true;
 
                 // spawn flag
-                _combatFlag = new DoodadSpawner();
-                _combatFlag.Id = 0;
-                _combatFlag.UnitId = 5014; // Combat Flag Id=5014;
-                _combatFlag.Position = duel.Challenger.Transform.CloneAsSpawnPosition();
-                _combatFlag.Position.X = duel.Challenger.Transform.World.Position.X - (duel.Challenger.Transform.World.Position.X - duel.Challenged.Transform.World.Position.X) / 2;
-                _combatFlag.Position.Y = duel.Challenger.Transform.World.Position.Y - (duel.Challenger.Transform.World.Position.Y - duel.Challenged.Transform.World.Position.Y) / 2;
-                _combatFlag.Position.Z = AppConfiguration.Instance.HeightMapsEnable
-                    ? WorldManager.Instance.GetHeight(_combatFlag.Position.ZoneId, _combatFlag.Position.X, _combatFlag.Position.Y)
+                _combatFlagSpawner = new DoodadSpawner();
+                _combatFlagSpawner.Id = 0;
+                _combatFlagSpawner.UnitId = 5014; // Combat Flag Id=5014;
+                _combatFlagSpawner.Position = duel.Challenger.Transform.CloneAsSpawnPosition();
+                _combatFlagSpawner.Position.X = duel.Challenger.Transform.World.Position.X - (duel.Challenger.Transform.World.Position.X - duel.Challenged.Transform.World.Position.X) / 2;
+                _combatFlagSpawner.Position.Y = duel.Challenger.Transform.World.Position.Y - (duel.Challenger.Transform.World.Position.Y - duel.Challenged.Transform.World.Position.Y) / 2;
+                _combatFlagSpawner.Position.Z = AppConfiguration.Instance.HeightMapsEnable
+                    ? WorldManager.Instance.GetHeight(_combatFlagSpawner.Position.ZoneId, _combatFlagSpawner.Position.X, _combatFlagSpawner.Position.Y)
                     : duel.Challenger.Transform.World.Position.Z - (duel.Challenger.Transform.World.Position.Z - duel.Challenged.Transform.World.Position.Z) / 2;
 
-                duel.DuelFlag = _combatFlag.Spawn(0); // set CombatFlag
+                duel.DuelFlag = _combatFlagSpawner.Spawn(); // set CombatFlag
 
                 // change the faction temporarily
                 SetFaction(duel.Challenger, FactionsEnum.RedTeam);
@@ -146,7 +146,8 @@ public class DuelManager : Singleton<DuelManager>
             duel.SendPacketsBoth(new SCDuelStatePacket(duel.Challenger.ObjId, duel.DuelFlag.ObjId));
             duel.SendPacketsBoth(new SCDuelStatePacket(duel.Challenged.ObjId, duel.DuelFlag.ObjId));
             // make the flag flutter in the wind
-            duel.SendPacketChallenger(new SCDoodadPhaseChangedPacket(_combatFlag.Last));
+            if (_combatFlagSpawner.Last != null)
+                duel.SendPacketChallenger(new SCDoodadPhaseChangedPacket(_combatFlagSpawner.Last));
             // Player can be attacked
             duel.SendPacketsBoth(new SCCombatEngagedPacket(duel.Challenger.ObjId));
             duel.SendPacketsBoth(new SCCombatEngagedPacket(duel.Challenged.ObjId));

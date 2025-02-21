@@ -535,7 +535,7 @@ public class Skill
     private static BaseUnit SetInitialTarget(BaseUnit caster, SkillCastTarget targetCaster)
     {
         var positionUnit = new BaseUnit();
-        positionUnit.ObjId = uint.MaxValue;
+        // positionUnit.ObjId = uint.MaxValue;
         positionUnit.Transform = caster.Transform.CloneDetached(positionUnit);
         switch (targetCaster)
         {
@@ -747,7 +747,7 @@ public class Skill
         Doodad doodad = null;
         if (Template.ChannelingDoodadId > 0)
         {
-            doodad = DoodadManager.Instance.Create(0, Template.ChannelingDoodadId, caster, true);
+            doodad = DoodadManager.Instance.Create(Template.ChannelingDoodadId, caster, true);
             doodad.Transform = caster.Transform.CloneDetached(doodad);
             doodad.InitDoodad();
             doodad.Spawn();

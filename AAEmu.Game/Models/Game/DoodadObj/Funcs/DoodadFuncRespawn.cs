@@ -26,7 +26,7 @@ public class DoodadFuncRespawn : DoodadPhaseFuncTemplate
                 UnitId = owner.TemplateId,
                 Position = spawnPos.CloneAsSpawnPosition()
             };
-            doodad.Spawn(0);
+            doodad.Spawn();
         }
 
         return false;

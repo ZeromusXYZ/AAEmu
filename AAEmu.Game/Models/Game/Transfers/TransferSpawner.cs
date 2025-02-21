@@ -16,25 +16,18 @@ public class TransferSpawner : Spawner<Transfer>
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
 
-    private List<Transfer> _spawned;
+    private List<Transfer> _spawned = [];
     private Transfer _lastSpawn;
     private int _scheduledCount;
     private int _spawnCount;
-
-    public uint Count { get; set; }
-
-    public TransferSpawner()
-    {
-        _spawned = [];
-        Count = 1;
-    }
+    public uint Count { get; set; } = 1;
 
     public List<Transfer> SpawnAll()
     {
         var list = new List<Transfer>();
         for (var num = _scheduledCount; num < Count; num++)
         {
-            var transfer = Spawn(0);
+            var transfer = Spawn();
             if (transfer != null)
             {
                 list.Add(transfer);
@@ -44,9 +37,9 @@ public class TransferSpawner : Spawner<Transfer>
         return list;
     }
 
-    public override Transfer Spawn(uint objId)
+    public override Transfer Spawn()
     {
-        var transfer = TransferManager.Instance.Create(objId, UnitId, this);
+        var transfer = TransferManager.Instance.Create(UnitId, this);
         if (transfer == null)
         {
             Logger.Warn("Transfer {0}, from spawn not exist at db", UnitId);

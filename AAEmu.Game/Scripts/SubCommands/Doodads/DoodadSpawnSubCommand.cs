@@ -42,7 +42,7 @@ public class DoodadSpawnSubCommand : SubCommandBase
         doodadSpawner.Position.Yaw = newYaw;
         doodadSpawner.Position.Pitch = 0;
         doodadSpawner.Position.Roll = 0;
-        var createdDoodad = doodadSpawner.Spawn(0, 0, character.ObjId);
+        var createdDoodad = doodadSpawner.Spawn(0, character.ObjId);
 
         if (parameters.ContainsKey("yaw"))
         {

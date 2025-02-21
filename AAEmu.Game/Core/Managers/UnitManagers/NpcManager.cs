@@ -65,18 +65,18 @@ public class NpcManager : Singleton<NpcManager>
         return null;
     }
 
-    public Npc Create(uint objectId, uint id)
+    public Npc Create(uint templateId)
     {
-        var template = GetTemplate(id);
+        var template = GetTemplate(templateId);
         if (template == null)
         {
             return null;
         }
 
         var npc = new Npc();
-        npc.ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId();
-        npc.TemplateId = id; // duplicate Id
-        npc.Id = id;
+        // npc.ObjId = objectId > 0 ? objectId : ObjectIdManager.Instance.GetNextId();
+        npc.TemplateId = templateId; // duplicate Id
+        npc.Id = templateId;
         npc.Template = template;
         npc.ModelId = template.ModelId;
         npc.CanFly = ModelManager.Instance.IsFlyOrSwim(template.ModelId);
@@ -87,10 +87,10 @@ public class NpcManager : Singleton<NpcManager>
         if (template.TotalCustomId == 0)
         {
             // load random hairstyles
-            var templ = LoadCustom(template);
-            template.HairId = templ.HairId;
-            template.ModelParams = templ.ModelParams;
-            template.BodyItems = templ.BodyItems;
+            var customTemplate = LoadCustom(template);
+            template.HairId = customTemplate.HairId;
+            template.ModelParams = customTemplate.ModelParams;
+            template.BodyItems = customTemplate.BodyItems;
         }
 
         SetEquipItemTemplate(npc, template.Items.Headgear, EquipmentItemSlot.Head);

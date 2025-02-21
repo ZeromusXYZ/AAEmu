@@ -42,7 +42,7 @@ public class CSSelectCharacterPacket : GamePacket
             }
             else
             {
-                Connection.ActiveChar.ObjId = ObjectIdManager.Instance.GetNextId();
+                // Connection.ActiveChar.ObjId = ObjectIdManager.Instance.GetNextId();
                 Character.UsedCharacterObjIds.TryAdd(character.Id, character.ObjId);
             }
 

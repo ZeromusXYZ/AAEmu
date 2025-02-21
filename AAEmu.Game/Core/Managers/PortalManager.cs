@@ -393,7 +393,7 @@ public class PortalManager : Singleton<PortalManager>
         var template = NpcManager.Instance.GetTemplate(templateId);
         var portalUnitModel = new Models.Game.Units.Portal
         {
-            ObjId = ObjectIdManager.Instance.GetNextId(),
+            // ObjId = ObjectIdManager.Instance.GetNextId(),
             OwnerId = ((Character)owner).Id,
             TemplateId = templateId,
             Template = template,

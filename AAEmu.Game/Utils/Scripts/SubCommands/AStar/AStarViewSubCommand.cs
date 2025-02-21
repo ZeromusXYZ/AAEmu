@@ -59,7 +59,7 @@ public class AStarViewSubCommand : SubCommandBase
             doodadSpawner.Position.Pitch = 0;
             doodadSpawner.Position.Roll = 0;
 
-            var createdDoodad = doodadSpawner.Spawn(0, 0, ((Character)character).ObjId);
+            var createdDoodad = doodadSpawner.Spawn(0, ((Character)character).ObjId);
 
             //character.SendMessage($"AStar: Doodad ObjId:{createdDoodad.ObjId}, Template {unitTemplateId} spawned");
         }

@@ -145,7 +145,7 @@ public class Spawn : ICommand
                     doodadSpawner.Position.Yaw = angle;
                     doodadSpawner.Position.Pitch = 0;
                     doodadSpawner.Position.Roll = 0;
-                    doodadSpawner.Spawn(0, 0, character.ObjId);
+                    doodadSpawner.Spawn(0, character.ObjId);
                     break;
             }
         }

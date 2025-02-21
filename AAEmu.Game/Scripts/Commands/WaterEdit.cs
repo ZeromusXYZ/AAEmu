@@ -98,7 +98,7 @@ public class WaterEdit : ICommand
         {
             SelectedWater.UpdateBounds();
 
-            var centerDoodad = DoodadManager.Instance.Create(0, centerSurfaceDoodadId);
+            var centerDoodad = DoodadManager.Instance.Create(centerSurfaceDoodadId);
             centerDoodad.Transform.Local.SetPosition(SelectedWater.GetCenter(true));
             centerDoodad.Show();
             Markers.Add(centerDoodad);
@@ -107,7 +107,7 @@ public class WaterEdit : ICommand
             for (var p = 0; p < SelectedWater.Points.Count - 1; p++)
             {
                 var point = SelectedWater.Points[p];
-                var bottomDoodad = DoodadManager.Instance.Create(0, bottomDoodadId);
+                var bottomDoodad = DoodadManager.Instance.Create(bottomDoodadId);
                 bottomDoodad.Transform.Local.SetPosition(point);
                 bottomDoodad.Show();
                 Markers.Add(bottomDoodad);
@@ -118,7 +118,7 @@ public class WaterEdit : ICommand
                 // surfaceDoodad.Show();
                 // Markers.Add(surfaceDoodad);
 
-                var surfaceUnit = NpcManager.Instance.Create(0, topNpcId);
+                var surfaceUnit = NpcManager.Instance.Create(topNpcId);
                 surfaceUnit.Transform.Local.SetPosition(point);
                 surfaceUnit.Transform.Local.SetHeight(point.Z + SelectedWater.Height);
                 if (p != 0)
@@ -140,7 +140,7 @@ public class WaterEdit : ICommand
                 for (var i = 1; i < dividers; i++)
                 {
                     var h = SelectedWater.Height / dividers * i;
-                    var middleDoodad = DoodadManager.Instance.Create(0, middleDoodadId);
+                    var middleDoodad = DoodadManager.Instance.Create(middleDoodadId);
                     middleDoodad.Transform.Local.SetPosition(point);
                     middleDoodad.Transform.Local.SetHeight(point.Z + h);
                     middleDoodad.Show();

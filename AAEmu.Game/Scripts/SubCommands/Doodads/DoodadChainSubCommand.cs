@@ -22,7 +22,7 @@ public class DoodadChainSubCommand : SubCommandBase
         IDictionary<string, ParameterValue> parameters, IMessageOutput messageOutput)
     {
         uint templateId = parameters["templateId"];
-        var doodad = DoodadManager.Instance.Create(0, templateId);
+        var doodad = DoodadManager.Instance.Create(templateId);
         if (doodad == null)
         {
             SendColorMessage(messageOutput, Color.Red, $"Doodad with templateId {templateId} was not found");

@@ -139,7 +139,7 @@ public class IdManager
             Interlocked.Increment(ref _freeIdCount);
         }
         else
-            Logger.Warn("{0}: release objectId {1} failed", _name, usedObjectId);
+            Logger.Warn($"{_name}: release objectId {usedObjectId} failed");
     }
 
     public virtual void ReleaseId(IEnumerable<uint> usedObjectIds)

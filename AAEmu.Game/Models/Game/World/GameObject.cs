@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using AAEmu.Game.Core.Managers;
+using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Core.Network.Game;
 using AAEmu.Game.Core.Packets.G2C;
@@ -16,7 +17,7 @@ public class GameObject : IGameObject
     private bool _disabledSetPosition;
 
     public Guid Guid { get; set; } = Guid.NewGuid();
-    public uint ObjId { get; set; }
+    public uint ObjId { get; set; } = ObjectIdManager.Instance.GetNextId();
     public uint InstanceId { get; set; } = WorldManager.DefaultInstanceId;
 
     public bool DisabledSetPosition
@@ -56,6 +57,13 @@ public class GameObject : IGameObject
     public GameObject()
     {
         Transform = new Transform.Transform(this, null);
+    }
+
+    ~GameObject()
+    {
+        if (ObjId > 0)
+            ObjectIdManager.Instance.ReleaseId(ObjId);
+        ObjId = 0;
     }
 
     public virtual void SetPosition(float x, float y, float z, float rotationX, float rotationY, float rotationZ)
