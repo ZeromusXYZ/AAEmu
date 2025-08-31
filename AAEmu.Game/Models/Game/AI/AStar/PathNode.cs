@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Numerics;
 
 using AAEmu.Game.Core.Managers;
+using AAEmu.Game.Models.CryEngine.Entities;
 using AAEmu.Game.Models.Game.World;
 using AAEmu.Game.Utils;
 
@@ -65,23 +66,50 @@ public class PathNode
     private float EstimateFullPathLength => PathLengthFromStart + PathLengthToEnd;
 
     /// <summary>
+    /// Copy of the nodeDescription type used for this position
+    /// </summary>
+    public byte NodeType { get; set; }
+
+    /// <summary>
     /// Basic method of route calculation.
     /// </summary>
     /// <param name="world"></param>
     /// <param name="start"></param>
     /// <param name="goal"></param>
+    /// <param name="containsDifferentNodeTypes"></param>
     /// <returns></returns>
-    public List<Vector3> FindPath(WorldInstance world, Vector3 start, Vector3 goal)
+    public List<Vector3> FindPath(WorldInstance world, Vector3 startLocation, Vector3 goalLocation, out bool containsDifferentNodeTypes)
     {
+        containsDifferentNodeTypes = false;
+        var startNodeType = 2;
         // Find the nearest point from the start point in the list of geodata points and start the search from it.
-        var posStart = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(start.X, start.Y, start.Z));
-        if (posStart != null)
-            start = posStart.Pos; // replace it with the nearest point from the geodata
-        var posEnd = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(goal.X, goal.Y, goal.Z));
-        if (posEnd != null)
-            goal = posEnd.Pos;// replace it with the nearest point from the geodata
-        EndPointPos = goal;
-        var rawDistance = Vector3.Distance(start, goal);
+        var posStart = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(startLocation.X, startLocation.Y, startLocation.Z), 4);
+        if ((posStart != null && (posStart.Pos - startLocation).Length() < 5f))
+        {
+            startNodeType = posStart.Type;
+        }
+        else
+        {
+            posStart = new NodeDescriptor(null) { Pos = startLocation with { Z = world.Template.GetHeight(startLocation.X, startLocation.Y) }};
+        }
+        var posEnd = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(goalLocation.X, goalLocation.Y, goalLocation.Z), 4);
+        //if (posEnd != null)
+        //    goal = posEnd.Pos;// replace it with the nearest point from the geodata
+
+        if ((posEnd != null && (posEnd.Pos - goalLocation).Length() < 5f))
+        {
+            if (posEnd.Type != startNodeType)
+                containsDifferentNodeTypes = true;
+        }
+        else
+        {
+            posEnd = new NodeDescriptor(null) { Pos = goalLocation with { Z = world.Template.GetHeight(goalLocation.X, goalLocation.Y) }};
+            if (startNodeType != 2)
+                containsDifferentNodeTypes = true;
+        }
+
+        EndPointPos = posEnd.Pos;
+        var rawDistance = Vector3.Distance(startLocation, goalLocation);
 
         // Step 1.
         var closedSet = new Collection<PathNode>();
@@ -90,12 +118,13 @@ public class PathNode
         // Step 2.
         var startNode = new PathNode
         {
-            CurrentTargetPos = posStart?.Pos ?? start,
-            Position = start,
-            EndPointPos = goal,
+            CurrentTargetPos = posStart.Pos,
+            Position = startLocation,
+            EndPointPos = goalLocation,
             CameFrom = null,
             PathLengthFromStart = 0,
-            PathLengthToEnd = GetHeuristicPathLength(start)
+            PathLengthToEnd = GetHeuristicPathLength(startLocation),
+            NodeType = posStart.Type
         };
         openSet.Add(startNode);
 
@@ -108,9 +137,9 @@ public class PathNode
             var currentNode = openSet.OrderBy(node => node.EstimateFullPathLength).First();
 
             // Step 4.
-            if (currentNode.Position.Equals(goal) || maxLoopsLeft <= 0)
+            if (currentNode.Position.Equals(goalLocation) || maxLoopsLeft <= 0)
             {
-                var result = GetPathForNode(currentNode);
+                var result = GetPathForNode(currentNode, out containsDifferentNodeTypes);
                 // Leave the nearest point taken from geodata instead of the point from where we are going
                 // result[0] = pos1; // replace the first and the last point with the real one
                 // result[^1] = pos2;
@@ -150,6 +179,7 @@ public class PathNode
             }
         }
         // Step 10.
+        containsDifferentNodeTypes = false;
         return [];
     }
 
@@ -196,7 +226,7 @@ public class PathNode
         }
 
         // Find the nearest node
-        var nearestNode = bai.FindClosestNetMissionNode(pathNode.CurrentTargetPos);
+        var nearestNode = bai.FindClosestNetMissionNode(pathNode.CurrentTargetPos, 0);
         if (nearestNode == null)
         {
             // Was not able to find a nearby node
@@ -238,15 +268,19 @@ public class PathNode
     /// </summary>
     /// <param name="pathNode"></param>
     /// <returns></returns>
-    private static List<Vector3> GetPathForNode(PathNode pathNode)
+    private static List<Vector3> GetPathForNode(PathNode pathNode, out bool hasDifferentNodeTypes)
     {
         var result = new List<Vector3>();
         var currentNode = pathNode;
+        hasDifferentNodeTypes = false;
+        var startNodeType = pathNode.NodeType;
         while (currentNode != null)
         {
             result.Add(currentNode.Position);
             //ViewPoint(currentNode.Position, 5014u); // let's show the point for debugging purposes
             currentNode = currentNode.CameFrom;
+            if (currentNode?.NodeType != startNodeType)
+                hasDifferentNodeTypes = true;
         }
         result.Reverse();
 

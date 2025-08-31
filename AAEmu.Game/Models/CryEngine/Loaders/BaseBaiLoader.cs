@@ -250,7 +250,7 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
         HideMissionReaders.Clear();
     }
 
-    public NodeDescriptor FindClosestNetMissionNode(Vector3 pos)
+    public NodeDescriptor FindClosestNetMissionNode(Vector3 pos, byte onlyNodeTypes)
     {
         NodeDescriptor nearestNode = null;
         var nearestDistance = float.MaxValue;
@@ -258,6 +258,9 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
         {
             foreach (var (index, nodeDescriptor) in netMissionReader.NodeDescriptorList)
             {
+                if (onlyNodeTypes > 0 && onlyNodeTypes != nodeDescriptor.Type)
+                    continue;
+
                 if (nearestNode == null)
                 {
                     nearestNode = nodeDescriptor;

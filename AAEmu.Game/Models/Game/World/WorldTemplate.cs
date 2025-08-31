@@ -245,4 +245,23 @@ public class WorldTemplate
         var pathsPos = pos.ToPathsIndex();
         return PathBaiLoader.GetValueOrDefault(((uint)pathsPos.Item1, (uint)pathsPos.Item2));
     }
+
+    public List<Vector3> GetNearbyFloorHeightPoints(float x, float y)
+    {
+        var res = new List<Vector3>();
+        // Get bordering points
+        var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
+
+        // Get heights for these points
+        var heightTl = GetRawHeightMapHeight(border.Left, border.Top);
+        res.Add(new Vector3(border.Left, border.Top, heightTl));
+        var heightTr = GetRawHeightMapHeight(border.Right, border.Top);
+        res.Add(new Vector3(border.Right, border.Top, heightTr));
+        var heightBl = GetRawHeightMapHeight(border.Left, border.Bottom);
+        res.Add(new Vector3(border.Left, border.Bottom, heightBl));
+        var heightBr = GetRawHeightMapHeight(border.Right, border.Bottom);
+        res.Add(new Vector3(border.Right, border.Bottom, heightBr));
+
+        return res;
+    }
 }

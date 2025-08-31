@@ -20,7 +20,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
 
     public List<LinkDescriptor> GetAvailablePoints(NodeDescriptor point)
     {
-        return point.NetMission.LinkDescriptorList.Where(l => l.SourceNode == point.Id).ToList() ?? [];
+        return point.NetMission?.LinkDescriptorList.Where(l => l.SourceNode == point.Id).ToList() ?? [];
     }
 
     #region A point in a polygon
@@ -188,11 +188,8 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
 
     #region Finding the closest point
 
-    public NodeDescriptor FindСlosestToTheCurrent(uint zoneKey, Vector3 pos)
+    public NodeDescriptor FindСlosestToTheCurrent(uint zoneKey, Vector3 pos, byte onlyNodeTypes)
     {
-        var posX = pos.X;
-        var posY = pos.Y;
-
         NodeDescriptor closestPointFound = null;
         var minDist = 99999.0f;
         
@@ -200,6 +197,17 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         var cell = worldTemplate.GetCell(sourceCellX, sourceCellY);
         if (cell == null)
             return null;
+        
+        var nearbyHeightMapPoints = worldTemplate.GetNearbyFloorHeightPoints(pos.X, pos.Y);
+        foreach (var v3 in nearbyHeightMapPoints)
+        {
+            var distance = (v3 - pos).Length();
+            if (distance < minDist)
+            {
+                closestPointFound = new NodeDescriptor(null) { Pos = v3, Type = 2 };
+                minDist = distance;
+            }
+        }
 
         List<BaseBaiLoader> toCheckChunkList = [];
         if (cell.Template.ZoneBaiLoader.Count > 0)
@@ -237,6 +245,9 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
             {
                 foreach (var (_, nodeDescriptor) in netMission.NodeDescriptorList)
                 {
+                    // Filter node types if needed
+                    if (onlyNodeTypes > 0 && nodeDescriptor.Type != onlyNodeTypes)
+                        continue;
                     var distance = (nodeDescriptor.Pos - pos).Length();
                     if (distance < minDist)
                     {
@@ -261,6 +272,8 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         float res;
         //var stopWatch = new Stopwatch();
         //stopWatch.Start();
+        var rawFloorPos = pos with { Z = worldTemplate.GetHeight(pos.X, pos.Y) };
+        var rawFloorDelta = pos.Z - rawFloorPos.Z;
         try
         {
             var closestPoint = Vector3.Zero;
@@ -276,6 +289,14 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                     {
                         foreach (var (_, nodeDescriptor) in netMission.NodeDescriptorList)
                         {
+                            // Type 2 seems to be positions on the floor
+                            // Type 4 seems to represent "floating interior floors"
+                            if (nodeDescriptor.Type != 4) // ignore regular floor points  
+                                continue;
+                            var floorDelta = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(nodeDescriptor.Pos.X), (int)MathF.Round(nodeDescriptor.Pos.Y)) - nodeDescriptor.Pos.Z;
+                            if (double.Abs(floorDelta) > rawFloorDelta)
+                                continue; // Ignore this point if it's further from the actual floor
+
                             var dist = (nodeDescriptor.Pos - pos).Length();
                             if (dist < closestDistance)
                             {
@@ -291,12 +312,17 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                     }
                 }
 
+                /*
                 if (bai.VertexMissionReaders.Count > 0)
                 {
                     foreach (var vertexMission in bai.VertexMissionReaders)
                     {
                         foreach (var obstacleDataDescriptor in vertexMission.ObstacleDataDescriptorList)
                         {
+                            var floorDelta = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(obstacleDataDescriptor.Pos.X), (int)MathF.Round(obstacleDataDescriptor.Pos.Y)) - obstacleDataDescriptor.Pos.Z;
+                            if (double.Abs(floorDelta) < 0.25)
+                                continue; // Ignore this point if it's close to the floor
+
                             var dist = (obstacleDataDescriptor.Pos - pos).Length();
                             if (dist < closestDistance)
                             {
@@ -311,13 +337,14 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                         }
                     }
                 }
+                */
             }
             
             // Now compare to heightmap data
             if (closestDistance >= float.MaxValue) 
             {
                 // Fall back to raw heightmap data
-                closestPoint = new Vector3(pos.X, pos.Y, worldTemplate.GetRawHeightMapHeight((int)MathF.Round(pos.X), (int)MathF.Round(pos.Y)));
+                closestPoint = pos with { Z = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(pos.X), (int)MathF.Round(pos.Y)) };
             }
 
             return closestPoint.Z;
@@ -393,6 +420,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         {
             var startNode = foundPath[startNodeIndex];
             res.Enqueue(startNode);
+
             // Check nodes further in the path, starting at the furthest node defined by max skip (and getting closer with each loop)
             for (var endNodeIndex = startNodeIndex + maxNodeSkipCount; endNodeIndex > startNodeIndex; endNodeIndex--)
             {

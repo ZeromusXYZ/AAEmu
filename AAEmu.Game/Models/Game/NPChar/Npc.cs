@@ -1407,9 +1407,9 @@ public partial class Npc : Unit
         Ai.PathNode.EndPointPos = new Vector3(abuser.Transform.World.Position.X, abuser.Transform.World.Position.Y, abuser.Transform.World.Position.Z);
 
         Ai.PathNode.ZoneKey = Ai.Owner.Transform.ZoneId;
-        var resList = Ai.PathNode.FindPath(Ai.Owner.ParentWorld, Ai.PathNode.StartPointPos, Ai.PathNode.EndPointPos);
+        var resList = Ai.PathNode.FindPath(Ai.Owner.ParentWorld, Ai.PathNode.StartPointPos, Ai.PathNode.EndPointPos, out var hasDifferentTypes);
         resList.Add(abuser.Transform.World.Position);
-        var reducedPath = ParentWorld.Template.GeoData.ReducePath(resList, 10);
+        var reducedPath = hasDifferentTypes ? new Queue<Vector3>(resList) : ParentWorld.Template.GeoData.ReducePath(resList, 5);
         Ai.PathNode.FoundPath = reducedPath;
         if (abuser is Character player)
         {

@@ -6,6 +6,9 @@ public class NodeCell
 {
     private const int Inv5Cm = 20;
     private const uint Mask12Bit = (1 << 12) - 1;
+    private const ushort HeightMapValueBits = 0b_1111_1111_1110_0000;
+    private const ushort HeightMapMaterialBits = 0b_0000_0000_0001_1111;
+    private const byte HeightMapMaterialHole = 0b_0001_1111;
 
     public byte Version { get; set; }
     public byte Dummy { get; set; }
@@ -145,7 +148,17 @@ public class NodeCell
 
     private ushort GetRawHeight(int x, int y)
     {
-        return RawDataByIndex((ushort)x, (ushort)y);
+        return (ushort)(RawDataByIndex((ushort)x, (ushort)y) & HeightMapValueBits);
+    }
+
+    private ushort GetRawMaterial(int x, int y)
+    {
+        return (byte)(RawDataByIndex((ushort)x, (ushort)y) & HeightMapMaterialBits);
+    }
+
+    private bool GetRawHole(int x, int y)
+    {
+        return (bHasHoles > 0) && GetRawMaterial(x, y) == HeightMapMaterialHole;
     }
 
     private void UpScale()
