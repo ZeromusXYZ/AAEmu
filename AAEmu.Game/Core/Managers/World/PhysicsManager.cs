@@ -1,7 +1,12 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Numerics;
+using System.Text;
+using System.Threading;
+
+using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models;
+using AAEmu.Game.Models.ClientData;
 using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Units;
 using AAEmu.Game.Models.Game.Units.Movements;
@@ -11,6 +16,7 @@ using AAEmu.Game.Physics.Forces;
 using AAEmu.Game.Physics.HeightMaps;
 using AAEmu.Game.Physics.Util;
 using AAEmu.Game.Utils;
+using Jitter2.Collision.Shapes;
 using Jitter2.Dynamics;
 using Jitter2.LinearMath;
 
@@ -40,9 +46,12 @@ public class PhysicsManager
     /// <summary>
     /// The physics engine's World
     /// </summary>
-    internal Jitter2.World _physWorld;
+    public Jitter2.World PhysWorld { get; private set; }
 
-    internal Buoyancy _buoyancy;
+    /// <summary>
+    /// Buoyancy handler for ships
+    /// </summary>
+    public Buoyancy Buoyancy { get; private set; }
     internal bool ThreadRunning { get; set; }
 
     /// <summary>
@@ -65,16 +74,16 @@ public class PhysicsManager
     /// </summary>
     public void Initialize()
     {
-        _physWorld = new Jitter2.World();
-        _physWorld.Gravity = new JVector(0, -9.81f, 0);
+        PhysWorld = new Jitter2.World();
+        PhysWorld.Gravity = new JVector(0, -9.81f, 0);
 
-        _buoyancy = new Buoyancy(_physWorld) {
+        Buoyancy = new Buoyancy(PhysWorld) {
             FluidBox = new JBoundingBox(
                 new JVector(0, 0, 0), // Bottom
                 new JVector(SimulationWorld.Template.CellX * WorldManager.CELL_SIZE, SimulationWorld.Template.OceanLevel, SimulationWorld.Template.CellY * WorldManager.CELL_SIZE) // Surface
             )
         };
-        _buoyancy.UseOwnFluidArea(CustomWater);
+        Buoyancy.UseOwnFluidArea(CustomWater);
 
         Logger.Info($"{SimulationWorld.Template.Name} initialized.");
     }
@@ -119,8 +128,8 @@ public class PhysicsManager
 
             var heightmap = new Heightmap(hmapTerrain);
             WorldHeightMapTester = new HeightmapTester(heightmap);
-            _physWorld.BroadPhaseFilter = new HeightmapDetection(_physWorld, WorldHeightMapTester);
-            _physWorld.DynamicTree.AddProxy(WorldHeightMapTester, false);
+            PhysWorld.BroadPhaseFilter = new HeightmapDetection(PhysWorld, WorldHeightMapTester);
+            PhysWorld.DynamicTree.AddProxy(WorldHeightMapTester, false);
         }
         catch (Exception e)
         {
@@ -195,7 +204,7 @@ public class PhysicsManager
 
                     // 3. Step the physics world
                     // Potentially step multiple times to catch up if we were running behind.
-                    _physWorld.Step((float)physicsTotalDelta.TotalSeconds, false);
+                    PhysWorld.Step((float)physicsTotalDelta.TotalSeconds, false);
 
                     // 4. Sync positions and broadcast outside lock
                     // body, velocity, isMoving
@@ -314,7 +323,7 @@ public class PhysicsManager
         var rot = JQuaternion.CreateRotationY(slave.Transform.World.Rotation.Z);
         //                                     Width                   Length                  Height
         // var dimensions = new JVector(shipModel.MassBoxSizeX, shipModel.MassBoxSizeY, shipModel.MassBoxSizeZ);
-        var ctrl = new ShipController(_physWorld, shipModel, waterLevel: DefaultWaterLevel);
+        var ctrl = new ShipController(PhysWorld, shipModel, waterLevel: DefaultWaterLevel);
 
         ctrl.Build(initialPosition: pos, initialOrientation: rot);
 
@@ -324,7 +333,7 @@ public class PhysicsManager
         slave.ShipController = ctrl;
 
         EnqueueAddBody(slave.RigidBody);
-        _buoyancy.AddForRectangularParallelepiped(slave.RigidBody, 3);
+        Buoyancy.AddForRectangularParallelepiped(slave.RigidBody, 3);
 
         Logger.Debug($"AddShip {slave.Name} -> {SimulationWorld.Template.Name}");
     }
@@ -340,8 +349,8 @@ public class PhysicsManager
         var rigidBody = slave.RigidBody;
         rigidBody.SetActivationState(false);
         EnqueueRemoveBody(rigidBody);
-        _physWorld.Remove(rigidBody);
-        _buoyancy.Remove(rigidBody);
+        PhysWorld.Remove(rigidBody);
+        Buoyancy.Remove(rigidBody);
         slave.RigidBody = null;
 
         Logger.Debug($"RemoveShip {slave.Name} <- {SimulationWorld.Template.Name}");
@@ -480,7 +489,7 @@ public class PhysicsManager
 
         var penetration = slave.CachedFloorLevel - boatBottom;
         slave.RigidBody.Position += new JVector(0, penetration, 0); // Move the boat upwards to put the center level with the floor
-        var collisionForce = _physWorld.Gravity * -1f;
+        var collisionForce = PhysWorld.Gravity * -1f;
         slave.RigidBody.AddForce(collisionForce);
 
         // Gradually reduce speed
@@ -499,7 +508,7 @@ public class PhysicsManager
         ThreadRunning = false;
     }
 
-    public void Dispose() => _physWorld?.Dispose();
+    public void Dispose() => PhysWorld?.Dispose();
 
     /// <summary>
     /// Helper function to check water bodies
@@ -574,10 +583,6 @@ public class PhysicsManager
         };
     }
 
-    /// <summary>
-    /// Updates heightmap data with the data from the provided WorldCell
-    /// </summary>
-    /// <param name="cell"></param>
     public void UpdateHeightMapFromCellBody(WorldCell cell)
     {
         if (WorldHeightMapTester == null)
@@ -596,5 +601,108 @@ public class PhysicsManager
             }
         }
         Logger.Trace($"Post-Loaded {SimulationWorld} Cell {cell.CellX}, {cell.CellY}");
+    }
+
+
+    /// <summary>
+    /// Adds Triangle data to a list of JTriangles to form a quad
+    /// </summary>
+    /// <param name="triangles">List of triangles to add to</param>
+    /// <param name="baseOffset">Base offset to apply to added vertex points</param>
+    /// <param name="tl">Top-Left point</param>
+    /// <param name="tr">Top-Right point</param>
+    /// <param name="bl">Bottom-Left point</param>
+    /// <param name="br">Bottom-Right point</param>
+    /// <param name="holeTl">Is Top-left a hole</param>
+    /// <param name="holeTr">Is Top-Right a hole</param>
+    /// <param name="holeBl">Is Bottom-Left a hole</param>
+    /// <param name="holeBr">Is Bottom-Right a hole</param>
+    private void AddQuad(List<JTriangle> triangles, JVector baseOffset, JVector tl, JVector tr, JVector bl, JVector br, bool holeTl, bool holeTr, bool holeBl, bool holeBr)
+    {
+        // Don't add the triangle if even one of its sides is marked as a hole vertex
+        // Jitter2 goes counter-clock-wise for triangles to get the Normal pointing up
+        if (!(holeTl || holeBr || holeTr))
+        {
+            triangles.Add(new(baseOffset + tl, baseOffset + br, baseOffset + tr));
+        }
+
+        if (!(holeBr || holeTl || holeBl))
+        {
+            triangles.Add(new(baseOffset + br, baseOffset + tl, baseOffset + bl));
+        }
+    }
+
+    /// <summary>
+    /// Updates heightmap data with the data from the provided WorldCell using the Hmap nodes
+    /// </summary>
+    /// <param name="cell"></param>
+    public void AddHeightMapMeshFromCellBody(WorldCell cell)
+    {
+        var cellBody = PhysWorld.CreateRigidBody();
+        cellBody.Tag = cell;
+        cellBody.AffectedByGravity = false;
+        cellBody.Position = new JVector(cell.BoundingBox.Min.X, 0f, cell.BoundingBox.Min.Z);
+        // Load all nodes data of this cell into one JTriangle list
+        var cellTriangles = new List<JTriangle>();
+        foreach (var nodeCell in cell.LoadedHmap.Nodes)
+        {
+            var nodeOffset = new JVector(nodeCell.BoxHeightmap.Min.X % WorldManager.CELL_SIZE, 0, nodeCell.BoxHeightmap.Min.Y % WorldManager.CELL_SIZE);  
+            if (nodeCell.nSize <= 1)
+            {
+                // Add flat surface?
+                continue;
+            }
+
+            // Loop the heightmap data to generate a list of triangles that will create the surface 
+            for (ushort y = 0; y < nodeCell.nSize - 1; y++)
+            for (ushort x = 0; x < nodeCell.nSize - 1; x++)
+            {
+                var xPlusOne = (ushort)(x + 1);
+                var yPlusOne = (ushort)(y + 1);
+                var posX1 = (nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * x;
+                var posY1 = (nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * y;
+                var posX2 = (nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * xPlusOne;
+                var posY2 = (nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * yPlusOne;
+                AddQuad(cellTriangles, nodeOffset,
+                    new JVector(posX1, nodeCell.GetHeight(x, y), posY1), // TL
+                    new JVector(posX2, nodeCell.GetHeight(xPlusOne, y), posY1), // TR
+                    new JVector(posX1, nodeCell.GetHeight(x, yPlusOne), posY2), // BL
+                    new JVector(posX2, nodeCell.GetHeight(xPlusOne, yPlusOne), posY2), // BL
+                    (nodeCell.RawDataByIndex(x, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
+                    (nodeCell.RawDataByIndex(xPlusOne, y) & NodeCell.HeightMapMaterialBits) ==
+                    NodeCell.HeightMapMaterialHole,
+                    (nodeCell.RawDataByIndex(x, yPlusOne) & NodeCell.HeightMapMaterialBits) ==
+                    NodeCell.HeightMapMaterialHole,
+                    (nodeCell.RawDataByIndex(xPlusOne, yPlusOne) & NodeCell.HeightMapMaterialBits) ==
+                    NodeCell.HeightMapMaterialHole
+                );
+            }
+        }
+
+        // Load triangles into a mesh
+        var cellFloorMesh = new TriangleMesh(cellTriangles);
+        // Add all the Mesh's triangles as shapes to the RigidBody of the floor
+        cellBody.AddShape(new TriangleShape(cellFloorMesh, 0), false); // Has no mass
+        // Mark the floor as static
+        cellBody.IsStatic = true;
+        
+        // Save Triangles to RAW
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {cell.Template.Name} Cell {cell.CellX}-{cell.CellY} data");
+        sb.AppendLine($"o Cell_{cell.CellX}_{cell.CellY}");
+        // Add vertices
+        foreach (var vertex in cellFloorMesh.Vertices)
+        {
+            sb.AppendLine($"v {vertex.X:F2} {vertex.Y:F2} {vertex.Z:F2}");
+        }
+        // Add faces
+        foreach (var triangle in cellFloorMesh.Indices)
+        {
+            sb.AppendLine($"f {triangle.IndexA+1} {triangle.IndexB+1} {triangle.IndexC+1}");
+        }
+
+        var objFileName = Path.Combine(FileManager.AppPath, $"{cell.Template.Name}_Cell_{cell.CellX:00}_{cell.CellY:00}.obj");
+        File.WriteAllText(objFileName, sb.ToString());
+        Logger.Warn($"Wrote terrain export: {objFileName}");
     }
 }

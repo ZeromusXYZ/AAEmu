@@ -21,6 +21,7 @@ public class WorldCell
     internal ushort[,] HeightMap { get; private set; }
     private float MinHeight { get; set; }
     private float MaxHeight { get; set; }
+    public Hmap LoadedHmap { get; private set; }
 
     /// <summary>
     /// Bai files data to use in this cell
@@ -147,16 +148,16 @@ public class WorldCell
 
         // Read the cell hmap data
         using var br = new BinaryReader(stream);
-        var hmap = new Hmap();
+        LoadedHmap = new Hmap();
 
-        if (hmap.Read(br, false) < 0)
+        if (LoadedHmap.Read(br, false) < 0)
         {
             Logger.Error($"Error reading {heightMapFile}");
             return false;
         }
 
         // Sort nodes by position
-        var sortedNodes = hmap.Nodes
+        var sortedNodes = LoadedHmap.Nodes
             .OrderBy(cell => cell.BoxHeightmap.Min.X)
             .ThenBy(cell => cell.BoxHeightmap.Min.Y)
             .Where(x => x.pHMData.Length > 0)
@@ -191,15 +192,14 @@ public class WorldCell
             new JVector(CellOffset.X + WorldManager.CELL_SIZE, MaxHeight, CellOffset.Y + WorldManager.CELL_SIZE)
         );
 
-        #region update_physics_hmap
-
         // Update Physics world's heightmaps
         // TODO: Merge local heightmap into physics engine
         foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id))
         {
-            worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
+            // worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
+            worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
         }
-        #endregion
+
         return true;
     }
 
@@ -218,7 +218,7 @@ public class WorldCell
             return 0f; // out of bounds or not loaded
         }
 
-        return (float)(HeightMap[heightMapDataX, heightMapDataX] / Template.HeightMaxCoefficient);
+        return (float)((HeightMap[heightMapDataX, heightMapDataX] & NodeCell.HeightMapMaterialBits) / Template.HeightMaxCoefficient);
     }
 
     /// <summary>

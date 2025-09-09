@@ -6,9 +6,9 @@ public class NodeCell
 {
     private const int Inv5Cm = 20;
     private const uint Mask12Bit = (1 << 12) - 1;
-    private const ushort HeightMapValueBits = 0b_1111_1111_1110_0000;
-    private const ushort HeightMapMaterialBits = 0b_0000_0000_0001_1111;
-    private const byte HeightMapMaterialHole = 0b_0001_1111;
+    public const ushort HeightMapValueBits = 0b_1111_1111_1110_0000;
+    public const ushort HeightMapMaterialBits = 0b_0000_0000_0001_1111;
+    public const byte HeightMapMaterialHole = 0b_0001_1111;
 
     public byte Version { get; set; }
     public byte Dummy { get; set; }
