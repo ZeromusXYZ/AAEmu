@@ -1,4 +1,4 @@
-// #define EXPORT_TERRAIN_ON_LOAD
+#define EXPORT_TERRAIN_ON_LOAD
 
 using System.Collections.Concurrent;
 using System.Numerics;
@@ -634,6 +634,11 @@ public class PhysicsManager
         }
     }
 
+    private float Floor2(float value)
+    {
+        return MathF.Floor(value * 100f) / 100f;
+    }
+
     /// <summary>
     /// Updates heightmap data with the data from the provided WorldCell using the Hmap nodes
     /// </summary>
@@ -661,23 +666,20 @@ public class PhysicsManager
             {
                 var xPlusOne = (ushort)(x + 1);
                 var yPlusOne = (ushort)(y + 1);
-                var posX1 = (nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * x;
-                var posY1 = (nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * y;
-                var posX2 = (nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * xPlusOne;
-                var posY2 = (nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * yPlusOne;
+                var posX1 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * x,2);
+                var posY1 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * y,2);
+                var posX2 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * xPlusOne,2);
+                var posY2 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * yPlusOne,2);
                 AddQuad(cellTriangles, nodeOffset,
-                    new JVector(posX1, nodeCell.GetHeight(x, y), posY1), // TL
-                    new JVector(posX2, nodeCell.GetHeight(xPlusOne, y), posY1), // TR
-                    new JVector(posX1, nodeCell.GetHeight(x, yPlusOne), posY2), // BL
-                    new JVector(posX2, nodeCell.GetHeight(xPlusOne, yPlusOne), posY2), // BL
+                    new JVector(posX1, (nodeCell.GetHeight(x, y)), posY1), // TL
+                    new JVector(posX2, (nodeCell.GetHeight(xPlusOne, y)), posY1), // TR
+                    new JVector(posX1, (nodeCell.GetHeight(x, yPlusOne)), posY2), // BL
+                    new JVector(posX2, (nodeCell.GetHeight(xPlusOne, yPlusOne)), posY2), // BL
                     nodeCell.bHasHoles > 0,
                     (nodeCell.RawDataByIndex(x, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
-                    (nodeCell.RawDataByIndex(xPlusOne, y) & NodeCell.HeightMapMaterialBits) ==
-                    NodeCell.HeightMapMaterialHole,
-                    (nodeCell.RawDataByIndex(x, yPlusOne) & NodeCell.HeightMapMaterialBits) ==
-                    NodeCell.HeightMapMaterialHole,
-                    (nodeCell.RawDataByIndex(xPlusOne, yPlusOne) & NodeCell.HeightMapMaterialBits) ==
-                    NodeCell.HeightMapMaterialHole
+                    (nodeCell.RawDataByIndex(xPlusOne, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
+                    (nodeCell.RawDataByIndex(x, yPlusOne) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
+                    (nodeCell.RawDataByIndex(xPlusOne, yPlusOne) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole
                 );
             }
         }
