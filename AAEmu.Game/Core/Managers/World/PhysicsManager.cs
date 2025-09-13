@@ -1,3 +1,5 @@
+// #define EXPORT_TERRAIN_ON_LOAD
+
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Text;
@@ -617,16 +619,16 @@ public class PhysicsManager
     /// <param name="holeTr">Is Top-Right a hole</param>
     /// <param name="holeBl">Is Bottom-Left a hole</param>
     /// <param name="holeBr">Is Bottom-Right a hole</param>
-    private void AddQuad(List<JTriangle> triangles, JVector baseOffset, JVector tl, JVector tr, JVector bl, JVector br, bool holeTl, bool holeTr, bool holeBl, bool holeBr)
+    private void AddQuad(List<JTriangle> triangles, JVector baseOffset, JVector tl, JVector tr, JVector bl, JVector br, bool allowHoles, bool holeTl, bool holeTr, bool holeBl, bool holeBr)
     {
         // Don't add the triangle if even one of its sides is marked as a hole vertex
         // Jitter2 goes counter-clock-wise for triangles to get the Normal pointing up
-        if (!(holeTl || holeBr || holeTr))
+        if (!allowHoles || (!holeTl && !holeBr && !holeTr))
         {
             triangles.Add(new(baseOffset + tl, baseOffset + br, baseOffset + tr));
         }
 
-        if (!(holeBr || holeTl || holeBl))
+        if (!allowHoles || (!holeBr && !holeTl && !holeBl))
         {
             triangles.Add(new(baseOffset + br, baseOffset + tl, baseOffset + bl));
         }
@@ -668,6 +670,7 @@ public class PhysicsManager
                     new JVector(posX2, nodeCell.GetHeight(xPlusOne, y), posY1), // TR
                     new JVector(posX1, nodeCell.GetHeight(x, yPlusOne), posY2), // BL
                     new JVector(posX2, nodeCell.GetHeight(xPlusOne, yPlusOne), posY2), // BL
+                    nodeCell.bHasHoles > 0,
                     (nodeCell.RawDataByIndex(x, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
                     (nodeCell.RawDataByIndex(xPlusOne, y) & NodeCell.HeightMapMaterialBits) ==
                     NodeCell.HeightMapMaterialHole,
@@ -685,15 +688,17 @@ public class PhysicsManager
         cellBody.AddShape(new TriangleShape(cellFloorMesh, 0), false); // Has no mass
         // Mark the floor as static
         cellBody.IsStatic = true;
-        
-        // Save Triangles to RAW
+
+#if EXPORT_TERRAIN_ON_LOAD
+        // Save Triangles as Obj file
         var sb = new StringBuilder();
         sb.AppendLine($"# {cell.Template.Name} Cell {cell.CellX}-{cell.CellY} data");
         sb.AppendLine($"o Cell_{cell.CellX}_{cell.CellY}");
         // Add vertices
         foreach (var vertex in cellFloorMesh.Vertices)
         {
-            sb.AppendLine($"v {vertex.X:F2} {vertex.Y:F2} {vertex.Z:F2}");
+            var v = vertex.ToVector();
+            sb.AppendLine($"v {v.X:F2} {v.Y:F2} {v.Z:F2}");
         }
         // Add faces
         foreach (var triangle in cellFloorMesh.Indices)
@@ -704,5 +709,6 @@ public class PhysicsManager
         var objFileName = Path.Combine(FileManager.AppPath, $"{cell.Template.Name}_Cell_{cell.CellX:00}_{cell.CellY:00}.obj");
         File.WriteAllText(objFileName, sb.ToString());
         Logger.Warn($"Wrote terrain export: {objFileName}");
+#endif
     }
 }
