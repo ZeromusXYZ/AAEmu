@@ -1288,7 +1288,7 @@ public partial class Npc : Unit
 
         // TODO: Implement proper use for Transform.World.AddDistanceToFront
         var (newX, newY, newZ) = World.Transform.PositionAndRotation.AddDistanceToFront(travelDist, targetDist, Transform.Local.Position, other);
-        var targetPositionZ = WorldManager.Instance.GetReferenceHeight(Ai, newX, newY, newZ, Transform.ZoneId);
+        var targetPositionZ = ParentWorld.GetReferenceHeight(Ai, new Vector3(newX, newY, newZ), Transform.ZoneId);
         Transform.Local.SetPosition(newX, newY, targetPositionZ);
 
         var angle = MathUtil.CalculateAngleFrom(Transform.Local.Position, other);
@@ -1325,7 +1325,7 @@ public partial class Npc : Unit
     public void LookTowards(Vector3 other, byte flags = 4)
     {
         var oldPosition = Transform.Local.ClonePosition();
-        oldPosition.Z = WorldManager.Instance.GetReferenceHeight(Ai, oldPosition.X, oldPosition.Y, oldPosition.Z, Transform.ZoneId);
+        oldPosition.Z = ParentWorld.GetReferenceHeight(Ai, oldPosition, Transform.ZoneId);
         Transform.Local.SetPosition(oldPosition);
 
         var moveType = (UnitMoveType)MoveType.GetType(MoveTypeEnum.Unit);
@@ -1365,7 +1365,7 @@ public partial class Npc : Unit
     public void StopMovement()
     {
         var oldPosition = Transform.Local.ClonePosition();
-        oldPosition.Z = WorldManager.Instance.GetReferenceHeight(Ai, oldPosition.X, oldPosition.Y, oldPosition.Z, Transform.ZoneId);
+        oldPosition.Z = ParentWorld.GetReferenceHeight(Ai, oldPosition, Transform.ZoneId);
         Transform.Local.SetPosition(oldPosition);
 
         var moveType = (UnitMoveType)MoveType.GetType(MoveTypeEnum.Unit);

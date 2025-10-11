@@ -1,4 +1,4 @@
-﻿using AAEmu.Game.Core.Managers.World;
+using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Models.Game.Faction;
 using AAEmu.Game.Models.Game.Skills.Plots.Type;
 using AAEmu.Game.Models.Game.Skills.Plots.UpdateTargetMethods;
@@ -91,7 +91,10 @@ public class PlotTargetInfo
 
     private BaseUnit UpdateAreaTarget(PlotTargetAreaParams args, PlotState state, PlotEventTemplate plotEvent)
     {
-        var posUnit = new BaseUnit { ObjId = uint.MaxValue, Region = PreviousTarget.Region };
+        var posUnit = new BaseUnit();
+        posUnit.ParentWorld = PreviousTarget.ParentWorld;
+        posUnit.ObjId = uint.MaxValue;
+        posUnit.Region = PreviousTarget.Region;
         posUnit.Transform = PreviousTarget.Transform.CloneDetached(posUnit);
         var degrees = (float)args.Angle;
         posUnit.Transform.Local.Rotate(0, 0, degrees.DegToRad() * -1f);
@@ -101,7 +104,7 @@ public class PlotTargetInfo
             posUnit.Transform.Local.AddDistanceToFront(args.Distance / 1000f - 0.01f);
         }
         // TODO: Make this use geo data, need to check if we can grab parent world from here
-        posUnit.Transform.Local.SetHeight(Math.Max(PreviousTarget.Transform.World.Position.Z + args.HeightOffset / 1000f, WorldManager.Instance.GetHeight(posUnit.Transform)));
+        posUnit.Transform.Local.SetHeight(Math.Max(PreviousTarget.Transform.World.Position.Z + (args.HeightOffset / 1000f), posUnit.ParentWorld.GetHeight(posUnit.Transform.World.Position)));
 
         if (args.MaxTargets == 0)
         {

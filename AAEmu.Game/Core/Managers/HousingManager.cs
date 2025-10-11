@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Numerics;
 
 using AAEmu.Commons.Utils;
@@ -1108,7 +1108,7 @@ public class HousingManager(
                     house.Template.GardenRadius * yMultiplier + house.Transform.World.Position.Y,
                     +house.Transform.World.Position.Z);
                 // adjust height to the floor
-                doodad.Transform.Local.SetHeight(doodad.ParentWorld.Template.GeoData.GetHeight(doodad.Transform.World.Position));// worldManager.GetHeight(doodad.Transform)));
+                doodad.Transform.Local.SetHeight(doodad.ParentWorld.GetHeight(doodad.Transform.World.Position));// WorldManager.Instance.GetHeight(doodad.Transform)));
                 doodad.Transform.Local.SetZRotation(zRot);
                 //doodad.Transform.WorldId = world.Template.Id;
                 doodad.Transform.InstanceId = world.Id;

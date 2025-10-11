@@ -629,7 +629,7 @@ public class Teleport : ICommand
                 }
                 else
                 {
-                    var height = character.ParentWorld.Template.GeoData.GetHeight(new Vector3(
+                    var height = character.ParentWorld.GetHeight(new Vector3(
                         character.LocalPingPosition.X,
                         character.LocalPingPosition.Y,
                         5000f)); // WorldManager.Instance.GetHeight(character.Transform.ZoneId, character.LocalPingPosition.X, character.LocalPingPosition.Y, character.LocalPingPosition.Z);

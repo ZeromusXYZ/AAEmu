@@ -141,7 +141,7 @@ public class SCUnitStatePacket : GamePacket
 
         if (npc is not null)
         {
-            var referenceHeight = WorldManager.Instance.GetReferenceHeight(npc.Ai, _unit.Transform.Local.Position.X, _unit.Transform.Local.Position.Y, _unit.Transform.Local.Position.Z, _unit.Transform.ZoneId);
+            var referenceHeight = npc.ParentWorld.GetReferenceHeight(npc.Ai, _unit.Transform.Local.Position, _unit.Transform.ZoneId);
             _unit.Transform.Local.SetHeight(referenceHeight);
         }
 

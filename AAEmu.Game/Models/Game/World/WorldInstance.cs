@@ -4,6 +4,8 @@ using AAEmu.Commons.IO;
 using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.World;
+using AAEmu.Game.Models.Game.AI.v2.Behaviors.Common;
+using AAEmu.Game.Models.Game.AI.v2.Framework;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Models.Game.DoodadObj;
 using AAEmu.Game.Models.Game.Gimmicks;
@@ -249,12 +251,73 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     }
 
     /// <summary>
-    /// Gets height at target position using interpolation
+    /// Gets height at target position using various methods (recommended way to get solid surface height)
+    /// </summary>
+    /// <param name="pos"></param>
+    /// <returns></returns>
+    public float GetHeight(Vector3 pos)
+    {
+        // refPos to us as a starting point to find surface, we put this 2m higher that requested location
+        // to take into account possible model clipping
+        var refPos = pos with { Z = pos.Z + 2f };
+        // First try using physics engine
+        if (Physics is { WorldHeightMapTester: not null })
+            return GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
+
+        // Fallback to normal heightmap.dat only data
+        var target = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
+        if (target > 0f)
+            return target;
+
+        // Last resort using .bai files mesh
+        return Template.GeoData?.GetHeight(refPos, pos.Z) ?? 0f;
+    }
+
+    public float GetReferenceHeight(NpcAi ai, Vector3 pos, uint zoneId)
+    {
+        float finalHeight;
+
+        // 0. Just in case.
+        if (ai == null)
+        {
+            finalHeight = GetHeight(pos);
+            return finalHeight;
+        }
+
+        // 1. If an NPC can fly, the height is taken from the spawner's position.
+        if (ai.Owner.CanFly)
+        {
+            finalHeight = ai.Owner.Spawner.Position.Z;
+            return finalHeight;
+        }
+
+        // 2. For HoldPositionBehavior and IdleBehavior, the height is taken from the spawner.
+        switch (ai.GetCurrentBehavior())
+        {
+            case HoldPositionBehavior:
+            case IdleBehavior:
+                finalHeight = ai.Owner.Spawner.Position.Z;
+                return finalHeight;
+        }
+
+        // 3. Terrain height retrieval
+        finalHeight = GetHeight(pos);
+        if (finalHeight != 0/* && Math.Abs(worldHeight - Spawner.Position.Z) <= 0.1f*/)
+        {
+            return finalHeight;
+        }
+
+        // 4. Take the default height
+        return ai.Owner.Spawner?.Position.Z ?? ai.Owner.Transform.World.Position.Z;
+    }
+
+    /// <summary>
+    /// Gets height at target position using interpolation from heightmap.dat data
     /// </summary>
     /// <param name="x"></param>
     /// <param name="y"></param>
     /// <returns></returns>
-    public float GetHeight(float x, float y)
+    public float GetHeightUsingHeightMapDat(float x, float y)
     {
         // return GetRawHeightMapHeight((int)x, (int)y); // <-- the old way we used to do things
 
@@ -712,22 +775,27 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     
     #endregion events
 
-    public float GetHeightByRayCastOnHeightMapOnly(Vector3 targetPosition)
+    /// <summary>
+    /// Gets a solid floor location using ray-casting on the heightmaptester
+    /// </summary>
+    /// <param name="targetPosition"></param>
+    /// <returns></returns>
+    public float GetHeightByRayCastOnHeightMapOnly(Vector3 targetPosition, float defaultHeight)
     {
         var totalHeight = 0f;
         var validCount = 0;
-        var testCount = 0;
+        // var testCount = 0;
 
         // If not initialized, return the reference point's height
         if (Physics == null || Physics.PhysWorld == null)
-            return targetPosition.Z;
+            return defaultHeight;
         
         // Initially start from slightly above the reference point casting downwards, this should technically be the model's height + 1 or so 
         var mainRayStart = new JVector(targetPosition.X, targetPosition.Z + 3f, targetPosition.Y);
         if (Physics.WorldHeightMapTester.RayCast(mainRayStart, -JVector.UnitY, out var _, out var lambda))
         {
-            testCount++;
-            Logger.Debug($"Total ray checks: {testCount}");
+            // testCount++;
+            // Logger.Debug($"Total ray checks: {testCount}");
             return mainRayStart.Y - lambda;
         }
 
@@ -736,7 +804,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         for (var y = 0; y < 3; y++)
         for (var x = 0; x < 3; x++)
         {
-            testCount++;
+            // testCount++;
             var v = new JVector(mainRayStart.X + (x * 0.05f), mainRayStart.Y, mainRayStart.Z + (y * 0.05f));
             if (Physics.WorldHeightMapTester.RayCast(v, -JVector.UnitY, out _, out var nearPointDistance))
             {
@@ -748,7 +816,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         // If there are still no hits, we might be under any floor, and we need to do a more dramatic raycast
         if (validCount <= 0)
         {
-            testCount++;
+            // testCount++;
             mainRayStart = new JVector(targetPosition.X, 5000f, targetPosition.Y);
             for (var y = 0; y < 3; y++)
             for (var x = 0; x < 3; x++)
@@ -762,7 +830,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
             }
         }
 
-        Logger.Debug($"Total ray checks: {testCount} ({validCount} hits)");
+        // Logger.Debug($"Total ray checks: {testCount} ({validCount} hits)");
         return validCount > 0 ? totalHeight / validCount : 0f;
     }
 }

@@ -266,8 +266,9 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
     /// Gets height using navmesh data
     /// </summary>
     /// <param name="pos"></param>
+    /// <param name="defaultHeight"></param>
     /// <returns></returns>
-    public float GetHeight(Vector3 pos)
+    public float GetHeight(Vector3 pos, float defaultHeight)
     {
         float res;
         //var stopWatch = new Stopwatch();
@@ -351,7 +352,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         }
         catch
         {
-            res = 0f;
+            res = defaultHeight;
         }
         //stopWatch.Stop();
         //Logger.Info($"GetHeight took {stopWatch.Elapsed}");

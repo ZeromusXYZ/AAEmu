@@ -743,7 +743,7 @@ public class Slave : Unit
                         newDoodad.PlantTime = DateTime.UtcNow;
                         newDoodad.Faction = FactionManager.Instance.GetFaction(FactionsEnum.Friendly);
 
-                        var floor = ParentWorld.Template.GeoData.GetHeight(newDoodad.Transform.World.Position); // WorldManager.Instance.GetHeight(newDoodad.Transform);
+                        var floor = ParentWorld.GetHeight(newDoodad.Transform.World.Position); // WorldManager.Instance.GetHeight(newDoodad.Transform);
                         var surface = WorldManager.Instance.GetWorld(doodad.Transform.InstanceId)?.Water?.GetWaterSurface(newDoodad.Transform.World.Position, out _) ?? 0f;
                         var depth = surface - floor;
 
@@ -808,7 +808,7 @@ public class Slave : Unit
                 doodad.Transform.Local.SetPosition(pos);
                 if (dropDoodad.OnWater == false)
                 {
-                    doodad.Transform.Local.SetHeight(doodad.ParentWorld.Template.GeoData.GetHeight(doodad.Transform.World.Position)); //WorldManager.Instance.GetHeight(doodad.Transform.ZoneId, pos.X, pos.Y, pos.Z));
+                    doodad.Transform.Local.SetHeight(doodad.ParentWorld.GetHeight(doodad.Transform.World.Position)); //WorldManager.Instance.GetHeight(doodad.Transform.ZoneId, pos.X, pos.Y, pos.Z));
                 }
                 else
                 {
@@ -951,7 +951,7 @@ public class Slave : Unit
     public void CreateWaterAndLandSurfaceCache()
     {
         // Get Floor and WaterSurface at given location
-        CachedFloorLevel = ParentWorld.GetHeight(Transform.World.Position.X, Transform.World.Position.Y);
+        CachedFloorLevel = ParentWorld.GetHeight(Transform.World.Position);
         CachedWaterSurface = ParentWorld.Water.GetWaterSurface(Transform.World.Position, out var cachedWaterFlow);
         CachedWaterFlow = cachedWaterFlow;
     }

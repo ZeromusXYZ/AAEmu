@@ -54,11 +54,11 @@ public class TestHeight : ICommand
         switch (mode)
         {
             case TestHeightMode.HeightMap:
-                return world.GetHeight(pos.X, pos.Y);
+                return world.GetHeightUsingHeightMapDat(pos.X, pos.Y);
             case TestHeightMode.BaiData:
-                return world.Template.GeoData.GetHeight(pos);
+                return world.Template.GeoData.GetHeight(pos, pos.Z);
             case TestHeightMode.RayCast:
-                return world.GetHeightByRayCastOnHeightMapOnly(pos);
+                return world.GetHeightByRayCastOnHeightMapOnly(pos, pos.Z);
                 /*
                 var ceiling = 10000f;
                 var rayStart = pos.ToJVector() with { Y = ceiling };

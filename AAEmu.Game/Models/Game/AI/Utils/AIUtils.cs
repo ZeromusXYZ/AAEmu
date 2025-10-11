@@ -20,7 +20,7 @@ public static class AiUtils
             ai.IdlePosition.Z);
 
         // Get terrain height at new position
-        newPosition.Z = WorldManager.Instance.GetReferenceHeight(ai, newPosition.X, newPosition.Y, newPosition.Z, ai.Owner.Transform.ZoneId);
+        newPosition.Z = ai.Owner?.ParentWorld?.GetReferenceHeight(ai, newPosition, ai.Owner.Transform.ZoneId) ?? newPosition.Z;
 
         return newPosition;
     }

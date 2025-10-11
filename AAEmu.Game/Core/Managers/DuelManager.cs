@@ -79,7 +79,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
                 };
                 _combatFlag.Position.X = duel.Challenger.Transform.World.Position.X - (duel.Challenger.Transform.World.Position.X - duel.Challenged.Transform.World.Position.X) / 2;
                 _combatFlag.Position.Y = duel.Challenger.Transform.World.Position.Y - (duel.Challenger.Transform.World.Position.Y - duel.Challenged.Transform.World.Position.Y) / 2;
-                _combatFlag.Position.Z = challenged.ParentWorld.Template.GeoData.GetHeight(_combatFlag.Position.AsPositionVector());
+                _combatFlag.Position.Z = challenged.ParentWorld.GetHeight(_combatFlag.Position.AsPositionVector());
 
                 duel.DuelFlag = _combatFlag.Spawn(0); // set CombatFlag
 

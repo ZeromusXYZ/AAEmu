@@ -114,7 +114,7 @@ public class LeapSkillController : SkillController
         var (newX, newY, newZ) = World.Transform.PositionAndRotation.AddDistanceToFront(travelDist, targetDist, Owner.Transform.Local.Position, _endPosition);
         Owner.Transform.Local.SetPosition(newX, newY, newZ);
 
-        var updZ = Owner.ParentWorld.Template.GeoData.GetHeight(Owner.Transform.World.Position); // WorldManager.Instance.GetHeight(Owner.Transform.ZoneId, newX, newY, newZ);
+        var updZ = Owner.ParentWorld.GetHeight(Owner.Transform.World.Position); // WorldManager.Instance.GetHeight(Owner.Transform.ZoneId, newX, newY, newZ);
         if (Math.Abs(newZ - updZ) < 1f)
         {
             Owner.Transform.Local.SetHeight(updZ);
