@@ -1,3 +1,5 @@
+// # define EXPORT_CELL_ON_LOAD
+
 using System.Numerics;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
@@ -169,7 +171,7 @@ public class WorldCell
         for (ushort sectorY = 0; sectorY < WorldManager.SECTORS_PER_CELL; sectorY++)
         {
             var node = LoadedHmap.SortedNodes[sectorX * WorldManager.SECTORS_PER_CELL + sectorY];
-            var doubleValue = node.FRange * 100000d;
+            // var doubleValue = node.FRange * 100000d;
 
             for (ushort unitX = 0; unitX < WorldManager.SECTOR_HMAP_RESOLUTION; unitX++) // sector = 32x32 unit size
             for (ushort unitY = 0; unitY < WorldManager.SECTOR_HMAP_RESOLUTION; unitY++)
@@ -213,6 +215,11 @@ public class WorldCell
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
             // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
         }
+        
+#if EXPORT_CELL_ON_LOAD
+        if (CellX == 13 && CellY == 10) // Ezna
+            ExportThisCell();
+#endif
 
         return true;
     }
@@ -250,7 +257,7 @@ public class WorldCell
             return NodeCell.HeightMapMaterialHole; // out of bounds or not loaded, return as hole
         }
 
-        return MaterialsMap[heightMapDataX, heightMapDataX];
+        return MaterialsMap[heightMapDataX, heightMapDataY];
     }
 
     /// <summary>
@@ -265,4 +272,21 @@ public class WorldCell
         var yy = (int)(y - CellOffset.Y) / 2;
         return GetHeightMapDataInCell(xx, yy);
     }
+    
+#if EXPORT_CELL_ON_LOAD
+    private void ExportThisCell()
+    {
+        var exportMaterialFileName = $"{Template.Name}_cell_{CellX:00}_{CellY:00}_material.data";
+        var fs = new FileStream(exportMaterialFileName, FileMode.Create);
+        for(var y = WorldManager.CELL_HMAP_RESOLUTION-1; y >= 0; y--)
+        for (var x = 0; x < WorldManager.CELL_HMAP_RESOLUTION; x++)
+        {
+            var b = MaterialsMap[x, y];
+            if (b == NodeCell.HeightMapMaterialHole)
+                b = 0xff;
+            fs.WriteByte(b);
+        }
+        fs.Close();
+    }
+#endif
 }

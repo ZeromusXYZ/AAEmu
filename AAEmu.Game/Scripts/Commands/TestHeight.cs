@@ -240,14 +240,18 @@ public class TestHeight : ICommand
             var borderTop = borderBottom + 2;
 
             // Get heights for these points
-            var heightTL = world.GetHeightMapHeight(borderLeft, borderTop); // 10
-            var heightTR = world.GetHeightMapHeight(borderRight, borderTop); // 6
-            var heightBL = world.GetHeightMapHeight(borderLeft, borderBottom); // 14
-            var heightBR = world.GetHeightMapHeight(borderRight, borderBottom); // 16
-            CommandManager.SendNormalText(this, messageOutput, $"TL @ {borderLeft}x{borderTop} = {heightTL}");
-            CommandManager.SendNormalText(this, messageOutput, $"TR @ {borderRight}x{borderTop} = {heightTR}");
-            CommandManager.SendNormalText(this, messageOutput, $"BL @ {borderLeft}x{borderBottom} = {heightBL}");
-            CommandManager.SendNormalText(this, messageOutput, $"BR @ {borderRight}x{borderBottom} = {heightBR}");
+            var heightTL = world.GetHeightMapHeight(borderLeft, borderTop);
+            var heightTR = world.GetHeightMapHeight(borderRight, borderTop);
+            var heightBL = world.GetHeightMapHeight(borderLeft, borderBottom);
+            var heightBR = world.GetHeightMapHeight(borderRight, borderBottom);
+            var matTL = world.GetHeightMapMaterial(borderLeft, borderTop);
+            var matTR = world.GetHeightMapMaterial(borderRight, borderTop);
+            var matBL = world.GetHeightMapMaterial(borderLeft, borderBottom);
+            var matBR = world.GetHeightMapMaterial(borderRight, borderBottom);
+            CommandManager.SendNormalText(this, messageOutput, $"TL @ {borderLeft}x{borderTop} = {heightTL} (m{matTL})");
+            CommandManager.SendNormalText(this, messageOutput, $"TR @ {borderRight}x{borderTop} = {heightTR} (m{matTR})");
+            CommandManager.SendNormalText(this, messageOutput, $"BL @ {borderLeft}x{borderBottom} = {heightBL} (m{matBL})");
+            CommandManager.SendNormalText(this, messageOutput, $"BR @ {borderRight}x{borderBottom} = {heightBR} (m{matBR})");
         }
     }
 }

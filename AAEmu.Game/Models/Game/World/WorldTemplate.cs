@@ -128,6 +128,25 @@ public class WorldTemplate
     }
 
     /// <summary>
+    /// Gets the material data at target position
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public float GetHeightMapMaterial(int x, int y)
+    {
+        var cellX = x / WorldManager.CELL_SIZE;
+        var cellY = y / WorldManager.CELL_SIZE;
+        if (cellX < 0 || cellX > CellX || cellY < 0 || cellY > CellY)
+            return 0f; // out of bounds
+        var cell = Cells[cellX, cellY].VerifyCellLoaded();
+        var sx = (x % WorldManager.CELL_SIZE) / 2;
+        var sy = (y % WorldManager.CELL_SIZE) / 2;
+        // return cell.MaterialsMap[sx, sy];
+        return cell.GetMaterialsDataInCell(sx, sy);
+    }
+
+    /// <summary>
     /// Line linear interpolation
     /// </summary>
     /// <param name="start"></param>

@@ -89,6 +89,12 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
         return Heightmap?.GetHeight(x, z) ?? 0f;
     }
 
+    /// <summary>
+    /// Gets material at target position
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="z"></param>
+    /// <returns></returns>
     public byte GetMaterial(int x, int z)
     {
         return Heightmap?.GetMatarial(x, z) ?? NodeCell.HeightMapMaterialHole;
@@ -134,10 +140,14 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
             if (x < WorldBoundingBox.Min.X || x > WorldBoundingBox.Max.X || WorldBoundingBox.Min.Z < 0 || z > WorldBoundingBox.Max.Z)
                 goto continue_walk;
 
-            var ha = GetMaterial(x + 0, z + 0) == NodeCell.HeightMapMaterialHole;
-            var hb = GetMaterial(x + 1, z + 0) == NodeCell.HeightMapMaterialHole;
-            var hc = GetMaterial(x + 1, z + 1) == NodeCell.HeightMapMaterialHole;
-            var hd = GetMaterial(x + 0, z + 1) == NodeCell.HeightMapMaterialHole;
+            var ma = GetMaterial(x + 0, z + 0);
+            var mb = GetMaterial(x + 1, z + 0);
+            var mc = GetMaterial(x + 1, z + 1);
+            var md = GetMaterial(x + 0, z + 1);
+            var ha = ma == NodeCell.HeightMapMaterialHole;
+            var hb = mb == NodeCell.HeightMapMaterialHole;
+            var hc = mc == NodeCell.HeightMapMaterialHole;
+            var hd = md == NodeCell.HeightMapMaterialHole;
             // check this quad!
             var a = new JVector(x + 0, GetHeight(x + 0, z + 0), z + 0);
             var b = new JVector(x + 1, GetHeight(x + 1, z + 0), z + 0);

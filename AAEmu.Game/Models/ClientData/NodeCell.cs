@@ -162,6 +162,7 @@ public class NodeCell()
                         HeightData[targetX, targetY] = MathUtil.Blerp(rawHeightTl, rawHeightTr, rawHeightBl, rawHeightBr, offX, offY);
 
                         // "Merge" the materials flags and use that as a materials
+                        // If one of them is a hole (0x1F), they the result should also be a hole, just don't use them to draw the texture of the floor with it :)
                         // TODO: Verify if it's actually flags and not values
                         var averageMaterial =
                             GetRawMaterial(nearestRawPoints.Left, nearestRawPoints.Top) |
