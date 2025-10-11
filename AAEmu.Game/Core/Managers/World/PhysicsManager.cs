@@ -69,7 +69,7 @@ public class PhysicsManager
     /// <summary>
     /// Used heightmap tester, saved so it can be edited later
     /// </summary>
-    private HeightmapTester WorldHeightMapTester { get; set; }
+    public HeightmapTester WorldHeightMapTester { get; set; }
 
     /// <summary>
     /// Initialize the Physics engine and creates the ocean water body
@@ -104,6 +104,7 @@ public class PhysicsManager
             var dataX = SimulationWorld.Template.CellX * WorldManager.CELL_HMAP_RESOLUTION;
             var dataZ = SimulationWorld.Template.CellY * WorldManager.CELL_HMAP_RESOLUTION;
             var hmapTerrain = new float[dataX, dataZ];
+            var hmapMaterials = new byte[dataX, dataZ];
             var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
             var cellCount = 0;
             for (var cellY = 0; cellY < SimulationWorld.Template.CellY; cellY++)
@@ -117,10 +118,10 @@ public class PhysicsManager
                     for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
                     for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
                     {
-                        var x = cellX * WorldManager.CELL_HMAP_RESOLUTION + inX;
-                        var y = cellY * WorldManager.CELL_HMAP_RESOLUTION + inY;
-                        hmapTerrain[x, y] = cell.GetHeightMapDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION,
-                            y % WorldManager.CELL_HMAP_RESOLUTION);
+                        var x = (cellX * WorldManager.CELL_HMAP_RESOLUTION) + inX;
+                        var y = (cellY * WorldManager.CELL_HMAP_RESOLUTION) + inY;
+                        hmapTerrain[x, y] = cell.GetHeightMapDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION, y % WorldManager.CELL_HMAP_RESOLUTION);
+                        hmapMaterials[x, y] = cell.GetMaterialsDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION, y % WorldManager.CELL_HMAP_RESOLUTION);
                     }
                 }
 
@@ -128,7 +129,9 @@ public class PhysicsManager
                     Logger.Debug($"Loading {SimulationWorld} heightmap data {cellCount / cellCountMax * 100f:F0}%");
             }
 
-            var heightmap = new Heightmap(hmapTerrain);
+            if (AppConfiguration.Instance.World.PreLoadTerrain)
+                Logger.Debug($"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells into physics engine ");
+            var heightmap = new Heightmap(hmapTerrain, hmapMaterials);
             WorldHeightMapTester = new HeightmapTester(heightmap);
             PhysWorld.BroadPhaseFilter = new HeightmapDetection(PhysWorld, WorldHeightMapTester);
             PhysWorld.DynamicTree.AddProxy(WorldHeightMapTester, false);
@@ -593,19 +596,20 @@ public class PhysicsManager
         }
 
         // Copy over cell's data
-        for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
+        for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
         {
-            for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
+            for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
             {
-                var x = cell.CellX * WorldManager.CELL_HMAP_RESOLUTION + inX;
-                var y = cell.CellY * WorldManager.CELL_HMAP_RESOLUTION + inY;
-                WorldHeightMapTester.Heightmap.RawHeights[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                var x = (cell.CellX * WorldManager.CELL_HMAP_RESOLUTION) + inX;
+                var y = (cell.CellY * WorldManager.CELL_HMAP_RESOLUTION) + inY;
+                WorldHeightMapTester.Heightmap.Heights[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                WorldHeightMapTester.Heightmap.Materials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
             }
         }
         Logger.Trace($"Post-Loaded {SimulationWorld} Cell {cell.CellX}, {cell.CellY}");
     }
 
-
+/*
     /// <summary>
     /// Adds Triangle data to a list of JTriangles to form a quad
     /// </summary>
@@ -634,11 +638,6 @@ public class PhysicsManager
         }
     }
 
-    private float Floor2(float value)
-    {
-        return MathF.Floor(value * 100f) / 100f;
-    }
-
     /// <summary>
     /// Updates heightmap data with the data from the provided WorldCell using the Hmap nodes
     /// </summary>
@@ -653,29 +652,29 @@ public class PhysicsManager
         var cellTriangles = new List<JTriangle>();
         foreach (var nodeCell in cell.LoadedHmap.Nodes)
         {
-            var nodeOffset = new JVector(nodeCell.BoxHeightmap.Min.X % WorldManager.CELL_SIZE, 0, nodeCell.BoxHeightmap.Min.Y % WorldManager.CELL_SIZE);  
-            if (nodeCell.nSize <= 1)
+            var nodeOffset = new JVector(nodeCell.BoxHeightmap.Min.X % WorldManager.CELL_SIZE, 0, nodeCell.BoxHeightmap.Min.Y % WorldManager.CELL_SIZE);
+            if (nodeCell.NodeSize <= 1)
             {
                 // Add flat surface?
                 continue;
             }
 
-            // Loop the heightmap data to generate a list of triangles that will create the surface 
-            for (ushort y = 0; y < nodeCell.nSize - 1; y++)
-            for (ushort x = 0; x < nodeCell.nSize - 1; x++)
+            // Loop the heightmap data to generate a list of triangles that will create the surface
+            for (ushort y = 0; y < nodeCell.NodeSize - 1; y++)
+            for (ushort x = 0; x < nodeCell.NodeSize - 1; x++)
             {
                 var xPlusOne = (ushort)(x + 1);
                 var yPlusOne = (ushort)(y + 1);
-                var posX1 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * x,2);
-                var posY1 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * y,2);
-                var posX2 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.nSize - 1) * xPlusOne,2);
-                var posY2 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.nSize - 1) * yPlusOne,2);
+                var posX1 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.NodeSize - 1) * x,2);
+                var posY1 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.NodeSize - 1) * y,2);
+                var posX2 = MathF.Round((nodeCell.BoxHeightmap.Max.X - nodeCell.BoxHeightmap.Min.X) / (nodeCell.NodeSize - 1) * xPlusOne,2);
+                var posY2 = MathF.Round((nodeCell.BoxHeightmap.Max.Y - nodeCell.BoxHeightmap.Min.Y) / (nodeCell.NodeSize - 1) * yPlusOne,2);
                 AddQuad(cellTriangles, nodeOffset,
                     new JVector(posX1, (nodeCell.GetHeight(x, y)), posY1), // TL
                     new JVector(posX2, (nodeCell.GetHeight(xPlusOne, y)), posY1), // TR
                     new JVector(posX1, (nodeCell.GetHeight(x, yPlusOne)), posY2), // BL
                     new JVector(posX2, (nodeCell.GetHeight(xPlusOne, yPlusOne)), posY2), // BL
-                    nodeCell.bHasHoles > 0,
+                    nodeCell.NodeHasHoles > 0,
                     (nodeCell.RawDataByIndex(x, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
                     (nodeCell.RawDataByIndex(xPlusOne, y) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
                     (nodeCell.RawDataByIndex(x, yPlusOne) & NodeCell.HeightMapMaterialBits) == NodeCell.HeightMapMaterialHole,
@@ -713,4 +712,5 @@ public class PhysicsManager
         Logger.Warn($"Wrote terrain export: {objFileName}");
 #endif
     }
+*/
 }

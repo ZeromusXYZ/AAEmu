@@ -11,6 +11,7 @@ public class MathUtil
     private static readonly Vector3 UnitXAxis = new(1, 0, 0);
     private static readonly Vector3 UnitYAxis = new(0, 1, 0);
     private static readonly Vector3 UnitZAxis = new(0, 0, 1);
+
     public static Point RotatePoint3D(Point point, float xRotation, float yRotation, float zRotation)
     {
         var xQ = new Quaternion(UnitXAxis, xRotation);
@@ -46,6 +47,7 @@ public class MathUtil
     {
         return CalculateAngleFrom(p1.X, p1.Y, p2.X, p2.Y);
     }
+
     public static double CalculateDirection(Vector3 obj1, Vector3 obj2)
     {
         var rad = Math.Atan2(obj2.Y - obj1.Y, obj2.X - obj1.X);
@@ -259,38 +261,6 @@ public class MathUtil
         return result;
     }
 
-    [Obsolete("Please use the variant with float rotation")]
-    public static (float, float)[] GetCuboidVertices(float length, float width, float x, float y, sbyte rotZ)
-    {
-        var radFront = ConvertDirectionToRadian(rotZ);
-        var radRight = ConvertDirectionToRadian(rotZ) - Math.PI / 2;
-
-        var cosFront = (float)Math.Cos(radFront);
-        var sinFront = (float)Math.Sin(radFront);
-        var cosRight = (float)Math.Cos(radRight);
-        var sinRight = (float)Math.Sin(radRight);
-
-        var result = new (float, float)[4];
-
-        var p1 = (width * cosFront + x, width * sinFront + y);
-        p1 = (length * cosRight + p1.Item1, length * sinRight + p1.Item2);
-        result[0] = p1;
-
-        var p2 = (width * cosFront + x, width * sinFront + y);
-        p2 = (-length * cosRight + p2.Item1, -length * sinRight + p2.Item2);
-        result[1] = p2;
-
-        var p3 = (-width * cosFront + x, -width * sinFront + y);
-        p3 = (-length * cosRight + p3.Item1, -length * sinRight + p3.Item2);
-        result[2] = p3;
-
-        var p4 = (-width * cosFront + x, -width * sinFront + y);
-        p4 = (length * cosRight + p4.Item1, length * sinRight + p4.Item2);
-        result[3] = p4;
-
-        return result;
-    }
-
     private static float Sign((float, float) p1, (float, float) p2, (float, float) p3)
     {
         return (p1.Item1 - p3.Item1) * (p2.Item2 - p3.Item2) - (p2.Item1 - p3.Item1) * (p1.Item2 - p3.Item2);
@@ -365,21 +335,6 @@ public class MathUtil
         return CalculateDistance(loc.Transform.World.Position, loc2.Transform.World.Position, includeZAxis);
     }
 
-    [Obsolete("Please use the Vector3 variant")]
-    public static float CalculateDistance(Point loc, Point loc2, bool includeZAxis = false)
-    {
-        double dx = loc.X - loc2.X;
-        double dy = loc.Y - loc2.Y;
-
-        if (includeZAxis)
-        {
-            double dz = loc.Z - loc2.Z;
-            return (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        }
-
-        return (float)Math.Sqrt(dx * dx + dy * dy);
-    }
-
     public static float GetDistance(Vector3 v1, Vector3 v2, bool point3d = false)
     {
         return point3d
@@ -434,5 +389,35 @@ public class MathUtil
         while (angle < -180.0)
             angle += 360.0;
         return angle;
+    }
+    
+
+    /// <summary>
+    /// Get interpolated value between 4 value points of a rectangle by it's x and y offset
+    /// </summary>
+    /// <param name="cX0Y0"></param>
+    /// <param name="cX1Y0"></param>
+    /// <param name="cX0Y1"></param>
+    /// <param name="cX1Y1"></param>
+    /// <param name="tx"></param>
+    /// <param name="ty"></param>
+    /// <returns></returns>
+    public static float Blerp(float cX0Y0, float cX1Y0, float cX0Y1, float cX1Y1, float tx, float ty)
+    {
+        return float.Lerp(float.Lerp(cX0Y0, cX1Y0, tx), float.Lerp(cX0Y1, cX1Y1, tx), ty);
+    }
+    
+    /// <summary>
+    /// Get interpolated position between 2 points
+    /// </summary>
+    /// <param name="firstVector"></param>
+    /// <param name="secondVector"></param>
+    /// <param name="by"></param>
+    /// <returns></returns>
+    public static Vector2 Lerp(Vector2 firstVector, Vector2 secondVector, float by)
+    {
+        var retX = float.Lerp(firstVector.X, secondVector.X, by);
+        var retY = float.Lerp(firstVector.Y, secondVector.Y, by);
+        return new Vector2(retX, retY);
     }
 }

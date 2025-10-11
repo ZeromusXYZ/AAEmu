@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
 using AAEmu.Game.Models.ClientData;
@@ -18,7 +18,8 @@ public class WorldCell
     public bool Loaded { get; private set; }
     private readonly Lock _loadLock = new();
     private Vector3 CellOffset { get; set; }
-    internal ushort[,] HeightMap { get; private set; }
+    internal float[,] HeightMap { get; private set; }
+    internal byte[,] MaterialsMap { get; private set; }
     private float MinHeight { get; set; }
     private float MaxHeight { get; set; }
     public Hmap LoadedHmap { get; private set; }
@@ -114,11 +115,12 @@ public class WorldCell
 
         lock (_loadLock)
         {
-            if (Loaded)
-                return this;
-
-            HeightMap = new ushort[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
-            LoadBaiFiles();
+            Loading = true;
+            // Assign heightmap array
+            HeightMap = new float[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
+            MaterialsMap = new byte[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
+            // Load data
+            // LoadBaiFiles();
             Loaded = LoadCellHeightMapFromClientData();
         }
         return this;
@@ -150,18 +152,13 @@ public class WorldCell
         using var br = new BinaryReader(stream);
         LoadedHmap = new Hmap();
 
-        if (LoadedHmap.Read(br, false) < 0)
+        if (LoadedHmap.Read(br) < 0)
         {
             Logger.Error($"Error reading {heightMapFile}");
             return false;
         }
 
-        // Sort nodes by position
-        var sortedNodes = LoadedHmap.Nodes
-            .OrderBy(cell => cell.BoxHeightmap.Min.X)
-            .ThenBy(cell => cell.BoxHeightmap.Min.Y)
-            .Where(x => x.pHMData.Length > 0)
-            .ToList();
+        LoadedHmap.SortNodes();
 
         // Read nodes into heightmap array
         #region ReadNodes
@@ -170,20 +167,37 @@ public class WorldCell
         MaxHeight = 0f;
         for (ushort sectorX = 0; sectorX < WorldManager.SECTORS_PER_CELL; sectorX++) // 16x16 sectors / cell
         for (ushort sectorY = 0; sectorY < WorldManager.SECTORS_PER_CELL; sectorY++)
-        for (ushort unitX = 0; unitX < WorldManager.SECTOR_HMAP_RESOLUTION; unitX++) // sector = 32x32 unit size
-        for (ushort unitY = 0; unitY < WorldManager.SECTOR_HMAP_RESOLUTION; unitY++)
         {
-            var node = sortedNodes[sectorX * WorldManager.SECTORS_PER_CELL + sectorY];
-            var oX = sectorX * WorldManager.SECTOR_HMAP_RESOLUTION + unitX;
-            var oY = sectorY * WorldManager.SECTOR_HMAP_RESOLUTION + unitY;
+            var node = LoadedHmap.SortedNodes[sectorX * WorldManager.SECTORS_PER_CELL + sectorY];
+            var doubleValue = node.FRange * 100000d;
 
-            var height = node.GetHeight(unitX, unitY);
-            var value = (ushort)(height * Template.HeightMaxCoefficient);
+            for (ushort unitX = 0; unitX < WorldManager.SECTOR_HMAP_RESOLUTION; unitX++) // sector = 32x32 unit size
+            for (ushort unitY = 0; unitY < WorldManager.SECTOR_HMAP_RESOLUTION; unitY++)
+            {
+                var oX = sectorX * WorldManager.SECTOR_HMAP_RESOLUTION + unitX;
+                var oY = sectorY * WorldManager.SECTOR_HMAP_RESOLUTION + unitY;
+                
+                /*
+                var rawValue = node.RawDataByIndex(unitX, unitY);
+                var rawHeight = (ushort)(rawValue & NodeCell.HeightMapValueBits);
+                var rawMaterial = (byte)(rawValue & NodeCell.HeightMapMaterialBits);
+                MaterialsMap[oX, oY] = rawMaterial;
 
-            HeightMap[oX, oY] = value;
-            MinHeight = MathF.Min((float)(value / Template.HeightMaxCoefficient), MinHeight);
-            MaxHeight = MathF.Max((float)(value / Template.HeightMaxCoefficient), MaxHeight);
+                var value = (ushort)(rawHeight * Template.HeightMaxCoefficient);
+
+                HeightMap[oX, oY] = (ushort)(
+                    doubleValue / 1.52604335620711 * Template.HeightMaxCoefficient / ushort.MaxValue * rawHeight +
+                    node.BoxHeightmap.Min.Z * Template.HeightMaxCoefficient);
+                */
+                var value = node.HeightData[unitX, unitY];
+                HeightMap[oX, oY] = value;
+                MaterialsMap[oX, oY] = node.MaterialData[unitX, unitY];
+
+                MinHeight = MathF.Min(value, MinHeight);
+                MaxHeight = MathF.Max(value, MaxHeight);
+            }
         }
+
         #endregion
 
         // Update bounding box
@@ -196,8 +210,8 @@ public class WorldCell
         // TODO: Merge local heightmap into physics engine
         foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id))
         {
-            // worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
-            worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
+            worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
+            // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
         }
 
         return true;
@@ -218,7 +232,25 @@ public class WorldCell
             return 0f; // out of bounds or not loaded
         }
 
-        return (float)((HeightMap[heightMapDataX, heightMapDataX] & NodeCell.HeightMapMaterialBits) / Template.HeightMaxCoefficient);
+        return HeightMap[heightMapDataX, heightMapDataY];
+    }
+
+    /// <summary>
+    /// Gets heightmap height at target data position, converted to float, but not smoothened
+    /// </summary>
+    /// <param name="heightMapDataX"></param>
+    /// <param name="heightMapDataY"></param>
+    /// <returns></returns>
+    public byte GetMaterialsDataInCell(int heightMapDataX, int heightMapDataY)
+    {
+        if (HeightMap == null ||
+            heightMapDataX < 0 || heightMapDataX > WorldManager.CELL_HMAP_RESOLUTION ||
+            heightMapDataY < 0 || heightMapDataY > WorldManager.CELL_HMAP_RESOLUTION)
+        {
+            return NodeCell.HeightMapMaterialHole; // out of bounds or not loaded, return as hole
+        }
+
+        return MaterialsMap[heightMapDataX, heightMapDataX];
     }
 
     /// <summary>

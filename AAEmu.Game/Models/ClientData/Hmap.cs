@@ -1,12 +1,11 @@
 ﻿namespace AAEmu.Game.Models.ClientData;
 
-public class Hmap
+public class Hmap()
 {
     public byte Version { get; set; }
     public byte Dummy { get; set; }
     public byte Flags { get; set; }
     public byte Flags2 { get; set; }
-
     public int ChunkSize { get; set; }
     public int HeightMapSizeInUnits { get; set; }
     public int UnitSizeInMeters { get; set; }
@@ -15,9 +14,10 @@ public class Hmap
     public float HeightmapZRatio { get; set; }
     public float OceanWaterLevel { get; set; }
 
-    public List<NodeCell> Nodes { get; set; } = [];
+    private List<NodeCell> Nodes { get; set; } = [];
+    public List<NodeCell> SortedNodes { get; private set; } = [];
 
-    public int Read(BinaryReader br, bool disabledReCalc)
+    public int Read(BinaryReader br)
     {
         Version = br.ReadByte();
         Dummy = br.ReadByte();
@@ -43,7 +43,7 @@ public class Hmap
             var node = new NodeCell();
             try
             {
-                node.Read(br, disabledReCalc);
+                node.Read(br);
                 nodesRead++;
             }
             catch
@@ -54,5 +54,18 @@ public class Hmap
             Nodes.Add(node);
         }
         return nodesRead;
+    }
+
+    /// <summary>
+    /// Sorts nodes by expected position 
+    /// </summary>
+    public void SortNodes()
+    {
+        // Sort nodes by position
+        SortedNodes = Nodes
+            .OrderBy(cell => cell.BoxHeightmap.Min.X)
+            .ThenBy(cell => cell.BoxHeightmap.Min.Y)
+            .Where(x => x.HasData())
+            .ToList();
     }
 }

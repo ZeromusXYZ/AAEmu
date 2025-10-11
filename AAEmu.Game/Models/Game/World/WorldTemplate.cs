@@ -115,16 +115,16 @@ public class WorldTemplate
     /// <param name="x"></param>
     /// <param name="y"></param>
     /// <returns></returns>
-    public float GetRawHeightMapHeight(int x, int y)
+    public float GetHeightMapHeight(int x, int y)
     {
         var cellX = x / WorldManager.CELL_SIZE;
         var cellY = y / WorldManager.CELL_SIZE;
         if (cellX < 0 || cellX > CellX || cellY < 0 || cellY > CellY)
             return 0f; // out of bounds
         var cell = Cells[cellX, cellY].VerifyCellLoaded();
-        var sx = x % WorldManager.CELL_SIZE / 2;
-        var sy = y % WorldManager.CELL_SIZE / 2;
-        return (float)(cell.HeightMap[sx, sy] / HeightMaxCoefficient);
+        var sx = (x % WorldManager.CELL_SIZE) / 2;
+        var sy = (y % WorldManager.CELL_SIZE) / 2;
+        return cell.HeightMap[sx, sy];
     }
 
     /// <summary>
@@ -179,10 +179,10 @@ public class WorldTemplate
         var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
 
         // Get heights for these points
-        var heightTl = GetRawHeightMapHeight(border.Left, border.Top);
-        var heightTr = GetRawHeightMapHeight(border.Right, border.Top);
-        var heightBl = GetRawHeightMapHeight(border.Left, border.Bottom);
-        var heightBr = GetRawHeightMapHeight(border.Right, border.Bottom);
+        var heightTl = GetHeightMapHeight(border.Left, border.Top);
+        var heightTr = GetHeightMapHeight(border.Right, border.Top);
+        var heightBl = GetHeightMapHeight(border.Left, border.Bottom);
+        var heightBr = GetHeightMapHeight(border.Right, border.Bottom);
         var offX = (x - border.Left) / 2;
         var offY = (y - border.Top) / 2;
         var height = Blerp(heightTl, heightTr, heightBl, heightBr, offX, offY); // bilinear interpolation
@@ -253,13 +253,13 @@ public class WorldTemplate
         var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
 
         // Get heights for these points
-        var heightTl = GetRawHeightMapHeight(border.Left, border.Top);
+        var heightTl = GetHeightMapHeight(border.Left, border.Top);
         res.Add(new Vector3(border.Left, border.Top, heightTl));
-        var heightTr = GetRawHeightMapHeight(border.Right, border.Top);
+        var heightTr = GetHeightMapHeight(border.Right, border.Top);
         res.Add(new Vector3(border.Right, border.Top, heightTr));
-        var heightBl = GetRawHeightMapHeight(border.Left, border.Bottom);
+        var heightBl = GetHeightMapHeight(border.Left, border.Bottom);
         res.Add(new Vector3(border.Left, border.Bottom, heightBl));
-        var heightBr = GetRawHeightMapHeight(border.Right, border.Bottom);
+        var heightBr = GetHeightMapHeight(border.Right, border.Bottom);
         res.Add(new Vector3(border.Right, border.Bottom, heightBr));
 
         return res;

@@ -10,7 +10,7 @@ using AAEmu.Game.Models.Game.Gimmicks;
 using AAEmu.Game.Models.Game.Indun;
 using AAEmu.Game.Models.Game.NPChar;
 using AAEmu.Game.Models.Game.Units;
-
+using Jitter2.LinearMath;
 using NLog;
 
 namespace AAEmu.Game.Models.Game.World;
@@ -262,10 +262,10 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
 
         // Get heights for these points
-        var heightTl = Template.GetRawHeightMapHeight(border.Left, border.Top);
-        var heightTr = Template.GetRawHeightMapHeight(border.Right, border.Top);
-        var heightBl = Template.GetRawHeightMapHeight(border.Left, border.Bottom);
-        var heightBr = Template.GetRawHeightMapHeight(border.Right, border.Bottom);
+        var heightTl = Template.GetHeightMapHeight(border.Left, border.Top);
+        var heightTr = Template.GetHeightMapHeight(border.Right, border.Top);
+        var heightBl = Template.GetHeightMapHeight(border.Left, border.Bottom);
+        var heightBr = Template.GetHeightMapHeight(border.Right, border.Bottom);
         var offX = (x - border.Left) / 2;
         var offY = (y - border.Top) / 2;
         var height = Blerp(heightTl, heightTr, heightBl, heightBr, offX, offY); // bilinear interpolation
@@ -711,4 +711,58 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     }
     
     #endregion events
+
+    public float GetHeightByRayCastOnHeightMapOnly(Vector3 targetPosition)
+    {
+        var totalHeight = 0f;
+        var validCount = 0;
+        var testCount = 0;
+
+        // If not initialized, return the reference point's height
+        if (Physics == null || Physics.PhysWorld == null)
+            return targetPosition.Z;
+        
+        // Initially start from slightly above the reference point casting downwards, this should technically be the model's height + 1 or so 
+        var mainRayStart = new JVector(targetPosition.X, targetPosition.Z + 3f, targetPosition.Y);
+        if (Physics.WorldHeightMapTester.RayCast(mainRayStart, -JVector.UnitY, out var _, out var lambda))
+        {
+            testCount++;
+            Logger.Debug($"Total ray checks: {testCount}");
+            return mainRayStart.Y - lambda;
+        }
+
+        // If not a direct hit, scan the 5 x 5 cm area around the intended position and try to get its average
+        // If position is exactly between the two triangles, it will not hit anything. This is a workaround for this situation
+        for (var y = 0; y < 3; y++)
+        for (var x = 0; x < 3; x++)
+        {
+            testCount++;
+            var v = new JVector(mainRayStart.X + (x * 0.05f), mainRayStart.Y, mainRayStart.Z + (y * 0.05f));
+            if (Physics.WorldHeightMapTester.RayCast(v, -JVector.UnitY, out _, out var nearPointDistance))
+            {
+                totalHeight += mainRayStart.Y - nearPointDistance;
+                validCount++;
+            }
+        }
+
+        // If there are still no hits, we might be under any floor, and we need to do a more dramatic raycast
+        if (validCount <= 0)
+        {
+            testCount++;
+            mainRayStart = new JVector(targetPosition.X, 5000f, targetPosition.Y);
+            for (var y = 0; y < 3; y++)
+            for (var x = 0; x < 3; x++)
+            {
+                var v = new JVector(mainRayStart.X + (x * 0.05f), 5000f, mainRayStart.Z + (y * 0.05f));
+                if (Physics.WorldHeightMapTester.RayCast(v, -JVector.UnitY, out var _, out var nearMaxPointDistance))
+                {
+                    totalHeight += 5000f - nearMaxPointDistance;
+                    validCount++;
+                }
+            }
+        }
+
+        Logger.Debug($"Total ray checks: {testCount} ({validCount} hits)");
+        return validCount > 0 ? totalHeight / validCount : 0f;
+    }
 }

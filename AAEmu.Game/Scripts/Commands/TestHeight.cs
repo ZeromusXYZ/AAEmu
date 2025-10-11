@@ -58,6 +58,8 @@ public class TestHeight : ICommand
             case TestHeightMode.BaiData:
                 return world.Template.GeoData.GetHeight(pos);
             case TestHeightMode.RayCast:
+                return world.GetHeightByRayCastOnHeightMapOnly(pos);
+                /*
                 var ceiling = 10000f;
                 var rayStart = pos.ToJVector() with { Y = ceiling };
                 if (world.Physics.PhysWorld.DynamicTree.RayCast(rayStart, -JVector.UnitY, ceiling, null, null,
@@ -65,6 +67,7 @@ public class TestHeight : ICommand
                     return ceiling - lambda;
                 else
                     return 0f;//pos.Z;
+                */
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
         }
@@ -237,10 +240,10 @@ public class TestHeight : ICommand
             var borderTop = borderBottom + 2;
 
             // Get heights for these points
-            var heightTL = world.GetRawHeightMapHeight(borderLeft, borderTop); // 10
-            var heightTR = world.GetRawHeightMapHeight(borderRight, borderTop); // 6
-            var heightBL = world.GetRawHeightMapHeight(borderLeft, borderBottom); // 14
-            var heightBR = world.GetRawHeightMapHeight(borderRight, borderBottom); // 16
+            var heightTL = world.GetHeightMapHeight(borderLeft, borderTop); // 10
+            var heightTR = world.GetHeightMapHeight(borderRight, borderTop); // 6
+            var heightBL = world.GetHeightMapHeight(borderLeft, borderBottom); // 14
+            var heightBR = world.GetHeightMapHeight(borderRight, borderBottom); // 16
             CommandManager.SendNormalText(this, messageOutput, $"TL @ {borderLeft}x{borderTop} = {heightTL}");
             CommandManager.SendNormalText(this, messageOutput, $"TR @ {borderRight}x{borderTop} = {heightTR}");
             CommandManager.SendNormalText(this, messageOutput, $"BL @ {borderLeft}x{borderBottom} = {heightBL}");

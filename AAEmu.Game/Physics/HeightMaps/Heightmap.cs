@@ -2,15 +2,17 @@
 
 namespace AAEmu.Game.Physics.HeightMaps;
 
-public class Heightmap(float[,] heights)
+public class Heightmap(float[,] heights, byte[,] materials)
 {
-    public float[,] RawHeights { get; init; } = heights;
-    public int Width => RawHeights.GetLength(0);
-    public int Height => RawHeights.GetLength(1);
+    public float[,] Heights { get; init; } = heights;
+    public byte[,] Materials { get; init; } = materials;
+    public int Width => Heights.GetLength(0);
+    public int Height => Heights.GetLength(1);
     public float MinHeight { get; } = heights.Cast<float>().Min();
     public float MaxHeight { get; } = heights.Cast<float>().Max();
 
-    public float GetHeight(int x, int z) => RawHeights[x / 2, z / 2];
+    public float GetHeight(int x, int z) => Heights[x / 2, z / 2];
+    public byte GetMatarial(int x, int z) => Materials[x / 2, z / 2];
 
     public JBoundingBox GetBoundingBox()
     {

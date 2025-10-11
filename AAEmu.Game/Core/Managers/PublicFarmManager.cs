@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 
 using AAEmu.Commons.Utils;
 using AAEmu.Game.Core.Managers.World;
@@ -33,10 +33,12 @@ public class PublicFarmManager(ITaskManager taskManager, IWorldManager worldMana
         taskManager.Schedule(lpTickStartTask, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
-    public void PublicFarmTick()
+    public static void PublicFarmTick()
     {
         // NOTE: Public farms only available in main_world
         var world = worldManager.GetWorld(WorldManager.DefaultInstanceId);
+        if (world == null)
+            return; // World not loaded yet, skip
         var deleted = new List<Doodad>();
         foreach (var doodad in world.SpawnManager?.GetAllPlayerDoodads() ?? [])
         {

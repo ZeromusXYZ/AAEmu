@@ -293,7 +293,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                             // Type 4 seems to represent "floating interior floors"
                             if (nodeDescriptor.Type != 4) // ignore regular floor points  
                                 continue;
-                            var floorDelta = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(nodeDescriptor.Pos.X), (int)MathF.Round(nodeDescriptor.Pos.Y)) - nodeDescriptor.Pos.Z;
+                            var floorDelta = worldTemplate.GetHeightMapHeight((int)MathF.Round(nodeDescriptor.Pos.X), (int)MathF.Round(nodeDescriptor.Pos.Y)) - nodeDescriptor.Pos.Z;
                             if (double.Abs(floorDelta) > rawFloorDelta)
                                 continue; // Ignore this point if it's further from the actual floor
 
@@ -344,7 +344,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
             if (closestDistance >= float.MaxValue) 
             {
                 // Fall back to raw heightmap data
-                closestPoint = pos with { Z = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(pos.X), (int)MathF.Round(pos.Y)) };
+                closestPoint = pos with { Z = worldTemplate.GetHeightMapHeight((int)MathF.Round(pos.X), (int)MathF.Round(pos.Y)) };
             }
 
             return closestPoint.Z;
