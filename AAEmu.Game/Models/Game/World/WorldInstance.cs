@@ -67,7 +67,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     /// <summary>
     /// Water definitions
     /// </summary>
-    public WaterBodies Water { get; set; }
+    public WaterBodies Water { get; set; } = new();
 
     /// <summary>
     /// Event handlers
@@ -405,6 +405,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         Physics = new PhysicsManager { SimulationWorld = this };
         Physics.Initialize();
         Physics.InitializeTerrain();
+        Physics.InitializeWater();
         Physics.StartPhysics();
     }
 

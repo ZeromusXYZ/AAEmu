@@ -1,9 +1,11 @@
-﻿using AAEmu.Game.Core.Managers;
+using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Core.Managers.World;
 using System.Drawing;
 using System.Numerics;
+using AAEmu.Game.Models.Game.DoodadObj;
+using AAEmu.Game.Models.Game.NPChar;
 using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.UnitManagers;
 using AAEmu.Game.Models.Game.Units;
@@ -86,8 +88,12 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
         {
             foreach (var area in worldInstance.Water.Areas)
             {
-                var offsetVec = area.Points[0] - character.Transform.World.Position;
-                var dist = offsetVec.Length();
+                foreach (var area in worldInstance.Water.Areas)
+                {
+                    if (area.Points.Count < 1)
+                        continue;
+                    var offsetVec = area.Points[0] - character.Transform.World.Position;
+                    var dist = offsetVec.Length();
 
                 if (NearbyList.Count <= 0)
                 {
@@ -122,8 +128,27 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
         {
             foreach (var marker in Markers)
             {
-                ObjectIdManager.Instance.ReleaseId(marker.ObjId);
-                marker.Delete();
+                foreach (var marker in Markers)
+                {
+                    if (marker is Doodad doodad)
+                    {
+                        if (doodad.Spawner != null)
+                            doodad.Spawner.Id = 0xffffffff;// removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
+                        doodad.Hide();
+                    }
+                    else if (marker is Npc npc)
+                    {
+                        if (npc.Spawner != null)
+                            npc.Spawner.Id = 0xffffffff;// removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
+                        npc.Hide();
+                    }
+                    else
+                    {
+                        ObjectIdManager.Instance.ReleaseId(marker.ObjId);
+                        marker.Delete();
+                    }
+                }
+                Markers.Clear();
             }
             Markers.Clear();
         }

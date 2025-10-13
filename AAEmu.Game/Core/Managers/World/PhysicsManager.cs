@@ -125,8 +125,8 @@ public class PhysicsManager
                     }
                 }
 
-                if (AppConfiguration.Instance.World.PreLoadTerrain)
-                    Logger.Debug($"Loading {SimulationWorld} heightmap data {cellCount / cellCountMax * 100f:F0}%");
+                if (AppConfiguration.Instance.World.PreLoadTerrain && (cellY % 2 == 1))
+                    Logger.Debug($"Loading {SimulationWorld} heightmap data {(cellCount / cellCountMax * 100f):F0}%");
             }
 
             if (AppConfiguration.Instance.World.PreLoadTerrain)
@@ -713,4 +713,21 @@ public class PhysicsManager
 #endif
     }
 */
+
+
+    /// <summary>
+    /// Adds water bodies from the world objects.dat data
+    /// </summary>
+    public void InitializeWater()
+    {
+        SimulationWorld.Water.OceanLevel = SimulationWorld.Template.OceanLevel;
+        for(var y = 0; y < SimulationWorld.Template.CellY; y++)
+        for (var x = 0; x < SimulationWorld.Template.CellX; x++)
+        {
+            var cell = SimulationWorld.Template.GetCell(x, y);
+            if (cell == null)
+                continue;
+            SimulationWorld.Water.AddFromCellData(cell);
+        }
+    }
 }

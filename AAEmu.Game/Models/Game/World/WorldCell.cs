@@ -5,6 +5,7 @@ using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
 using AAEmu.Game.Models.ClientData;
 using AAEmu.Game.Models.CryEngine.Loaders;
+using AAEmu.Game.Models.CryEngine.Objects;
 using Jitter2.LinearMath;
 using NLog;
 
@@ -25,6 +26,7 @@ public class WorldCell
     private float MinHeight { get; set; }
     private float MaxHeight { get; set; }
     public Hmap LoadedHmap { get; private set; }
+    public ObjectsFile LoadedObjectDat { get; set; }
 
     /// <summary>
     /// Bai files data to use in this cell
@@ -123,7 +125,8 @@ public class WorldCell
             MaterialsMap = new byte[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
             // Load data
             // LoadBaiFiles();
-            Loaded = LoadCellHeightMapFromClientData();
+            Loaded = LoadCellDataFromClient();
+            Loading = false;
         }
         return this;
     }
@@ -133,10 +136,11 @@ public class WorldCell
     /// </summary>
     /// <returns></returns>
     /// <exception cref="NotSupportedException"></exception>
-    private bool LoadCellHeightMapFromClientData()
+    private bool LoadCellDataFromClient()
     {
         var cellFileName = $"{CellX:000}_{CellY:000}";
-        var heightMapFile = Path.Combine("game", "worlds", Template.Name, "cells", cellFileName, "client", "terrain", "heightmap.dat");
+        var cellFolder =Path.Combine("game", "worlds", Template.Name, "cells", cellFileName);
+        var heightMapFile = Path.Combine(cellFolder, "client", "terrain", "heightmap.dat");
         if (!ClientFileManager.FileExists(heightMapFile))
         {
             return true;
@@ -202,11 +206,29 @@ public class WorldCell
 
         #endregion
 
-        // Update bounding box
+        // Update cell bounding box
         BoundingBox = new JBoundingBox(
             new JVector(CellOffset.X, MinHeight, CellOffset.Y), 
             new JVector(CellOffset.X + WorldManager.CELL_SIZE, MaxHeight, CellOffset.Y + WorldManager.CELL_SIZE)
         );
+
+        // Load object.dat file
+        var objectDatFile = Path.Combine(cellFolder, "client", "object.dat");
+        if (ClientFileManager.FileExists(objectDatFile))
+        {
+            var objects = new ObjectsFile(objectDatFile);
+            if (objects.ReadFile())
+            {
+                LoadedObjectDat = objects;
+                // Logger.Debug($"Loaded objects from {objectDatFile}");
+            }
+            else
+            {
+                LoadedObjectDat = objects;
+                if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0)
+                    Logger.Error($"Error loaded objects from {objectDatFile}, only {objects.AssetPathsList.Count} assets and {objects.PrefabsList.Count} prefabs read");
+            }
+        }
 
         // Update Physics world's heightmaps
         // TODO: Merge local heightmap into physics engine
@@ -214,13 +236,13 @@ public class WorldCell
         {
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
             // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
+            worldInstance.Water.AddFromCellData(this);
         }
         
 #if EXPORT_CELL_ON_LOAD
         if (CellX == 13 && CellY == 10) // Ezna
             ExportThisCell();
 #endif
-
         return true;
     }
 
@@ -289,4 +311,8 @@ public class WorldCell
         fs.Close();
     }
 #endif
+    public Vector3 GetCellWorldOffset()
+    {
+        return new Vector3(CellX * WorldManager.CELL_SIZE, CellY * WorldManager.CELL_SIZE, 0f);
+    }
 }

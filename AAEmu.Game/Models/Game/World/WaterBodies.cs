@@ -1,11 +1,17 @@
 using System.Numerics;
 using AAEmu.Commons.Utils;
+using AAEmu.Game.Models.CryEngine.Objects;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using NLog;
 
 namespace AAEmu.Game.Models.Game.World;
 
 public class WaterBodies
 {
+    [JsonIgnore]
+    private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
+
     [JsonProperty(DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
     public float OceanLevel { get; set; }
 
@@ -136,5 +142,47 @@ public class WaterBodies
         }
 
         return res;
+    }
+
+    public void AddFromCellData(WorldCell worldCell)
+    {
+        var prefabIdx = 0;
+        if (worldCell?.LoadedObjectDat == null)
+            return;
+        var cellOffset = worldCell.GetCellWorldOffset();
+        foreach (var prefab in worldCell.LoadedObjectDat.PrefabsList)
+        {
+            prefabIdx++;
+            if (prefab is not PrefabDataType11Water water)
+                continue;
+            switch(water.Flags)
+            {
+                case 2:
+                    // Lake?
+                    if (water.PointsList.Count <= 0)
+                        break;
+                    var newLake = new WaterBodyArea($"Lake_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
+                    newLake.Depth = water.EndPos.Z - water.StartPos.Z;
+                    // TODO: check what the rest of DATA does before the vector array
+                    foreach (var v3 in water.PointsList)
+                    {
+                        var p = cellOffset + v3 with { Z = water.EndPos.Z };
+                        if (!newLake.Points.Contains(p))
+                            newLake.Points.Add(p);
+                    }
+                    newLake.UpdateBounds();
+                    lock (_lock)
+                    {
+                        newLake.Id = (uint)Areas.Count;
+                        Areas.Add(newLake);
+                    }
+                    // Logger.Debug($"Added {newLake.Name} with {newLake.BorderPoints.Count} points");
+                    break;
+                default:
+                    // Don't know how to handle this
+                    // Logger.Warn($"Unknown water flags {water.Flags} in Cell {worldCell.CellX},{worldCell.CellY}, Idx {prefabIdx}");
+                    break;
+            }
+        }
     }
 }

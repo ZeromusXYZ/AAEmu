@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Models.Game.Char;
@@ -53,8 +53,7 @@ public class WaterEditCreateWaterSubCommand : SubCommandBase
                 
         WaterEditCmd.ShowSelectedArea(character);
                 
-        character.SendMessage($"[WaterEdit] Create new water cube {WaterEditCmd.SelectedWater.Name} - {WaterEditCmd.SelectedWater.Id}!!|r");
-            
-        character.SendMessage($"|cFFFF0000[WaterEdit] Conversion not yet implemented!|r");
+            character.SendMessage($"[WaterEdit] Create new water cube {WaterEditCmd.SelectedWater.Name} - {WaterEditCmd.SelectedWater.Id}!!|r");
+        }
     }
 }

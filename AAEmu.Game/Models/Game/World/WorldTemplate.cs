@@ -4,6 +4,7 @@ using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
 using AAEmu.Game.Models.CryEngine.Loaders;
+using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.World.Transform;
 using AAEmu.Game.Models.Game.World.Xml;
 using AAEmu.Game.Models.Game.World.Zones;
