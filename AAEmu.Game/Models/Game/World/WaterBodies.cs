@@ -155,34 +155,35 @@ public class WaterBodies
             prefabIdx++;
             if (prefab is not PrefabDataType11Water water)
                 continue;
-            switch(water.Flags)
+
+            // Does this water body have a border defined?
+            // If yes, use its shape
+            if (water.BorderPointsList.Count >= 2)
             {
-                case 2:
-                    // Lake?
-                    if (water.PointsList.Count <= 0)
-                        break;
-                    var newLake = new WaterBodyArea($"Lake_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
-                    newLake.Depth = water.EndPos.Z - water.StartPos.Z;
-                    // TODO: check what the rest of DATA does before the vector array
-                    foreach (var v3 in water.PointsList)
-                    {
-                        var p = cellOffset + v3 with { Z = water.EndPos.Z };
-                        if (!newLake.Points.Contains(p))
-                            newLake.Points.Add(p);
-                    }
-                    newLake.UpdateBounds();
-                    lock (_lock)
-                    {
-                        newLake.Id = (uint)Areas.Count;
-                        Areas.Add(newLake);
-                    }
-                    // Logger.Debug($"Added {newLake.Name} with {newLake.BorderPoints.Count} points");
-                    break;
-                default:
-                    // Don't know how to handle this
-                    // Logger.Warn($"Unknown water flags {water.Flags} in Cell {worldCell.CellX},{worldCell.CellY}, Idx {prefabIdx}");
-                    break;
+                var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
+                newLake.Depth = water.EndPos.Z - water.StartPos.Z;
+                // TODO: check what the rest of DATA does before the vector array
+                // There is likely information related to river directions and speed in there
+                foreach (var v3 in water.BorderPointsList)
+                {
+                    var p = cellOffset + v3 with { Z = water.EndPos.Z };
+                    // if (!newLake.Points.Contains(p)) // Filter the duplicates
+                        newLake.Points.Add(p);
+                }
+
+                newLake.UpdateBounds();
+                lock (_lock)
+                {
+                    newLake.Id = (uint)Areas.Count;
+                    Areas.Add(newLake);
+                }
             }
+            else if (water.PointsList1.Count >= 2)
+            {
+                // TODO: How to handle the in-shape values if border is not defined 
+            }
+
+            // Logger.Debug($"Added {newLake.Name} with {newLake.BorderPoints.Count} points");
         }
     }
 }

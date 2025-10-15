@@ -226,7 +226,7 @@ public class WorldCell
             {
                 LoadedObjectDat = objects;
                 if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0)
-                    Logger.Error($"Error loaded objects from {objectDatFile}, only {objects.AssetPathsList.Count} assets and {objects.PrefabsList.Count} prefabs read");
+                    Logger.Error($"Error loading objects from {objectDatFile}, only {objects.AssetPathsList.Count} assets and {objects.PrefabsList.Count} prefabs read");
             }
         }
 

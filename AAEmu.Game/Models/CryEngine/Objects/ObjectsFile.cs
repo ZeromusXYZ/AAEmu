@@ -152,7 +152,7 @@ public class ObjectsFile(string fileName)
 
                     var type6 = new PrefabDataType6Voxel();
                     type6.PrefabType = objectType;
-                    type6.Data = blockData;
+                    type6.Data = [];
                     type6.NumRanges = numRanges;
 
                     var currentPosInObject = numRangesOffset + 4;
@@ -164,59 +164,46 @@ public class ObjectsFile(string fileName)
                         type6.ChunkData.Add(blockData.Skip(currentPosInObject).Take(dataChunkSize).ToArray());
                         currentPosInObject += (4 + dataChunkSize);
                     }
+                    totalObjectSize = currentPosInObject - offset;
+                    type6.Data = blockData.Skip(offset).Take(totalObjectSize).ToArray();
                     PrefabsList.Add(type6);
                     if (currentPosInObject > blockSize)
                         return false;
-                    totalObjectSize = currentPosInObject - offset;
                     break;
                 case 11:
                     // Water
-                    if (offset + 123 > blockSize)
+                    const int StartOfVariableData = 0x7B;
+                    if (offset + StartOfVariableData > blockSize)
                         return false;
-                    var flagValue = blockData.Skip(offset + 43).FirstOrDefault();
-                    var arrayCount = BitConverter.ToInt32(blockData, offset + 119);
 
                     var type11 = new PrefabDataType11Water();
                     type11.PrefabType = objectType;
-                    type11.Data = blockData;
-                    type11.Flags = flagValue;
-                    type11.ArrayCount = arrayCount;
-                    type11.StartPos = new Vector3(BitConverter.ToSingle(blockData, 4),BitConverter.ToSingle(blockData, 8),BitConverter.ToSingle(blockData, 12));
-                    type11.EndPos = new Vector3(BitConverter.ToSingle(blockData, 16),BitConverter.ToSingle(blockData, 20),BitConverter.ToSingle(blockData, 24));
+                    type11.Data = [];
+                    type11.Flags = blockData.Skip(offset + 0x2B).FirstOrDefault();
+                    type11.StartPos = GetVector3(blockData, offset + 0x04);
+                    type11.EndPos =  GetVector3(blockData, offset + 0x10);
+                    type11.ArrayCount1 = BitConverter.ToInt32(blockData, offset + 0x6B);
+                    type11.ArrayCount2 = BitConverter.ToInt32(blockData, offset + 0x77);
 
-                    if (flagValue == 1)
-                    {
-                        var entryStart = 48 + 119 + 4;
-                        totalObjectSize = (arrayCount * 12) + entryStart;
-                        for (var i = 0; i < arrayCount; i++)
-                        {
-                            type11.PointsList.Add(GetVector3(blockData, entryStart + (i * 12)));
-                        }
-                    }
-                    else if (flagValue == 2)
-                    {
-                        var entryStart = 119 + 4;
-                        totalObjectSize = (arrayCount * 24) + entryStart;
-                        for (var i = 0; i < arrayCount; i++)
-                        {
-                            type11.PointsList.Add(GetVector3(blockData, entryStart + (i * 24)));
-                            type11.PointsList.Add(GetVector3(blockData, entryStart + (i * 24) + 12));
-                        }
-                    }
-                    else if (flagValue == 3)
-                    {
-                        var entryStart = 48 + 119 + 4;
-                        totalObjectSize = (arrayCount * 12) + entryStart;
-                        for (var i = 0; i < arrayCount; i++)
-                        {
-                            type11.PointsList.Add(GetVector3(blockData, entryStart + (i * 12)));
-                        }
-                    }
-                    else
-                    {
-                        return false;
-                    }
+                    totalObjectSize = (type11.ArrayCount1 * 12) + (type11.ArrayCount2 * 12) + StartOfVariableData;
 
+                    // Read points for inside data
+                    for (var i = 0; i < type11.ArrayCount1; i++)
+                        type11.PointsList1.Add(GetVector3(blockData, offset + StartOfVariableData + (i * 12)));
+
+                    // Read border data
+                    var entryStart2 = StartOfVariableData + (type11.ArrayCount1 * 12);
+                    for (var i = 0; i < type11.ArrayCount2; i++)
+                        type11.BorderPointsList.Add(GetVector3(blockData, offset + entryStart2 + (i * 12)));
+
+                    if ((type11.ArrayCount1 <= 0) && (type11.ArrayCount2 <= 0))
+                        return true;
+
+                    type11.Data = blockData.Skip(offset).Take(totalObjectSize).ToArray();
+                    if (type11.Data.Length != totalObjectSize)
+                    {
+                        Logger.Warn($"Size mismatch while reading {FileName} in block @ {br.BaseStream.Position}, {type11.Data.Length} != {totalObjectSize}");
+                    }
                     PrefabsList.Add(type11);
                     break;
                 case 13:
@@ -227,12 +214,12 @@ public class ObjectsFile(string fileName)
                     totalObjectSize = (countValue * 12) + 67;
                     var type13 = new PrefabDataType13Road();
                     type13.PrefabType = objectType;
-                    type13.Data = blockData;
                     type13.ArrayCount = countValue;
                     for (var i = 0; i < countValue; i++)
                     {
                         type13.PointsList.Add(GetVector3(blockData, 67 + (i * 12)));
                     }
+                    type13.Data = blockData.Skip(offset).Take(totalObjectSize).ToArray();
                     PrefabsList.Add(type13);
                     break;
                 default:
