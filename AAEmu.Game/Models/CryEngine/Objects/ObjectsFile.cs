@@ -45,6 +45,41 @@ public class ObjectsFile(string fileName)
 
             using var br = new BinaryReader(fs);
             
+            /*
+            // ImHex object.dat pattern file
+            struct AssetPathStruct {
+                u32 Unknown;
+                char AssetPath[256];
+            };
+
+            struct PrefabPathStruct {
+                u32 Unknown;
+                char AssetPath[256];
+            };
+
+            struct Vector3 {
+                float x;
+                float y;
+                float z;
+            };
+
+            u32 AssetPathCount @ 0x00;
+            AssetPathStruct AssetPaths[AssetPathCount] @ 0x04;
+
+            u32 prefabStart = 0x04 + (AssetPathCount * sizeof(AssetPathStruct));
+            u32 PrefabCount @ prefabStart;
+            PrefabPathStruct PrefabPaths[PrefabCount] @ prefabStart + 0x04;
+            u32 prefabBlockStart = prefabStart + (PrefabCount * sizeof(PrefabPathStruct)) + 0x04;
+
+            // Read PrefabNode
+            u32 PrefabNodeStart = prefabBlockStart;
+            u32 UnknownInt @ PrefabNodeStart;
+            Vector3 StartPos @ PrefabNodeStart + 0x04;
+            Vector3 EndPos @ PrefabNodeStart + 0x10;
+            u32 ObjectDataBlockSize @ PrefabNodeStart + 0x1C;
+            u8 ChildrenBitMask @ PrefabNodeStart + 0x20;
+            */
+
             // Asset Paths
             var assetPathCount = br.ReadUInt32();
             for (var i = 0u; i < assetPathCount; i++)
@@ -172,16 +207,53 @@ public class ObjectsFile(string fileName)
                     break;
                 case 11:
                     // Water
-                    const int StartOfVariableData = 0x7B;
+                    const int StartOfVariableData = 0x7B; // Variable points data starts at this offset
                     if (offset + StartOfVariableData > blockSize)
-                        return false;
+                        return false; // Minimum required size to possibly be valid 
 
                     var type11 = new PrefabDataType11Water();
-                    type11.PrefabType = objectType;
-                    type11.Data = [];
+                    /*
+                        // ImHex pattern for Prefab Type 11 (water)
+                        struct Vector3 {
+                            float x;
+                            float y;
+                            float z;
+                        };
+
+                        struct Color {
+                            u8 r;
+                            u8 g;
+                            u8 b;
+                            u8 a;
+                        } [[hex::inline_visualize("color", r, g, b, a)]];
+
+                        u32 PrefabType @ 0x00;
+                        Vector3 StartPos @ 0x04;
+                        Vector3 EndPos @ 0x10;
+                        Vector3 vector_at_0x1C @ 0x1C; // unknown Vector3
+                        u8 byte_100_at_0x28 @ 0x28; // seems to always be 100
+                        u8 byte_100_at_0x29 @ 0x29; // seems to always be 100
+                        u8 byte_at_0x2A @ 0x2A; // unknown
+                        u32 Flag @ 0x2B;
+                        u32 u32_at_0x2F_id__or_more_flags_maybe @ 0x2F; // unknown data
+                        float float_at_0x33 @ 0x33; // unknown data
+                        float float_at_0x37 @ 0x37; // unknown data
+                        float quaternion_at_0x3B[0x04] @ 0x3B; // unknown data, might not be a quaternion
+                        Vector3 normal_vector_at_0x4B @ 0x4B; // looks like the normal vector for the surface
+                        float vector3_at_0x57[0x03] @ 0x57; // unknown data
+                        float vector2_at_0x63[0x02] @ 0x63; // unknown data
+                        u32 ArrayCount1 @ 0x6B;
+                        Color maybe_color_1 @ 0x6F; // Looks like a color multiplier RGBA
+                        Color maybe_color_2 @ 0x73; // Looks like a color multiplier RGBA
+                        u32 ArrayCount2 @ 0x77;
+                        Vector3 SegmentDataPoints[ArrayCount1] @ 0x7B;
+                        Vector3 BorderDataPoints[ArrayCount2] @ 0x7B + (ArrayCount1 * 12);
+                    */
+                    type11.Data = []; // Default to blank data 
+                    type11.PrefabType = objectType; // u @ 0x00
+                    type11.StartPos = GetVector3(blockData, offset + 0x04); // 3 x float @ 0x04 
+                    type11.EndPos =  GetVector3(blockData, offset + 0x10);  //
                     type11.Flags = blockData.Skip(offset + 0x2B).FirstOrDefault();
-                    type11.StartPos = GetVector3(blockData, offset + 0x04);
-                    type11.EndPos =  GetVector3(blockData, offset + 0x10);
                     type11.ArrayCount1 = BitConverter.ToInt32(blockData, offset + 0x6B);
                     type11.ArrayCount2 = BitConverter.ToInt32(blockData, offset + 0x77);
 
