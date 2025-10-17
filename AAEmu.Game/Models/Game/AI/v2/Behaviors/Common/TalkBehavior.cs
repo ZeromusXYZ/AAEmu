@@ -23,7 +23,7 @@ public class TalkBehavior : BaseCombatBehavior
     private const uint VehicleNickId = 22;
     private const uint SpyglassId = 6129;
     // ------------------------------------------------------
-    private static readonly TimeSpan GreetCooldown = TimeSpan.FromMinutes(GreetTimer);
+    private static TimeSpan GreetCooldown { get; } = TimeSpan.FromMinutes(GreetTimer);
     private readonly Dictionary<uint, DateTime> _greeted = new();
     // ------------------------------------------------------
     private bool _isInitialized;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Numerics;
 using AAEmu.Commons.Utils;
@@ -337,6 +337,7 @@ public class NpcSpawner : Spawner<Npc>
                 continue;
 
             var hasDefinedTimeWindow = spawnerTemplate.StartTime > 0.0f && spawnerTemplate.EndTime > 0.0f;
+#pragma warning disable CA1508
             if (SpawnerId != spawnerId)
             {
                 if (hasDefinedTimeWindow || CheckGameScheduleStatus())
@@ -353,6 +354,7 @@ public class NpcSpawner : Spawner<Npc>
                     return true;
                 }
             }
+#pragma warning restore CA1508
         }
 
         return result;

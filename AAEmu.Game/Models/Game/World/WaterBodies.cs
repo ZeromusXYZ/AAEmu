@@ -161,7 +161,7 @@ public class WaterBodies
             if (water.BorderPointsList.Count >= 2)
             {
                 var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
-                newLake.Depth = water.EndPos.Z - water.StartPos.Z;
+                newLake.Depth = water.Depth; // water.EndPos.Z - water.StartPos.Z;
                 // TODO: check what the rest of DATA does before the vector array
                 // There is likely information related to river directions and speed in there
                 foreach (var v3 in water.BorderPointsList)
@@ -172,13 +172,14 @@ public class WaterBodies
                 }
 
                 newLake.UpdateBounds();
+                newLake.Speed = water.Speed;
                 lock (_lock)
                 {
                     newLake.Id = (uint)Areas.Count;
                     Areas.Add(newLake);
                 }
             }
-            else if (water.PointsList1.Count >= 2)
+            else if (water.SegmentPointsList.Count >= 2)
             {
                 // TODO: How to handle the in-shape values if border is not defined 
             }
