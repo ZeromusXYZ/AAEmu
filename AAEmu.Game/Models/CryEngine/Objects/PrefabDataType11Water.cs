@@ -48,9 +48,9 @@ public class PrefabDataType11Water() : PrefabDataBase(11)
         Flags = blockData.Skip(offset + 0x2B).FirstOrDefault();
         SegmentPointsCount = BitConverter.ToInt32(blockData, offset + 0x6B);
         BorderPointsCount = BitConverter.ToInt32(blockData, offset + 0x77);
-        Depth = BitConverter.ToInt32(blockData, offset + 0x6F);
+        Depth = EndPos.Z - StartPos.Z; // BitConverter.ToInt32(blockData, offset + 0x6F);
         Speed = BitConverter.ToInt32(blockData, offset + 0x73);
-        
+
         // TODO: Find out if there is a directional vector for water speed, or if uses the segment data for its direction
 
         var totalObjectSize = (SegmentPointsCount * 12) + (BorderPointsCount * 12) + StartOfVariableData;

@@ -29,7 +29,7 @@ float Tile_step_at_0x5F @ 0x5F;
 float Texture_scale_at_0x63[0x02] @ 0x63; // uv-scale
 
 u32 ArrayCount1 @ 0x6B;
-float Depth @ 0x6F;
+float Unknown_Depth_Maybe @ 0x6F;
 float Speed @ 0x73;
 u32 ArrayCount2 @ 0x77;
 Vector3 SegmentDataPoints[ArrayCount1] @ 0x7B;
