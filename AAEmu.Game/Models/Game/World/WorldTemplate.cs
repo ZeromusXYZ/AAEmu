@@ -8,6 +8,7 @@ using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.World.Transform;
 using AAEmu.Game.Models.Game.World.Xml;
 using AAEmu.Game.Models.Game.World.Zones;
+using AAEmu.Game.Physics.HeightMaps;
 using AAEmu.Game.Utils;
 using NLog;
 
@@ -109,6 +110,11 @@ public class WorldTemplate
     /// (PathX, PathY), BaiLoader
     /// </summary>
     public ConcurrentDictionary<(uint, uint), BaseBaiLoader> PathBaiLoader { get; init; } = new();
+
+    /// <summary>
+    ///  Heightmap data used by the physics engine
+    /// </summary>
+    public Heightmap PhysicsHeightMap { get; set; }
 
     /// <summary>
     /// Gets heightmap height at target position (not smoothened)

@@ -27,6 +27,8 @@ public class PrefabDataType11Water() : PrefabDataBase(11)
     public float Depth { get; private set; }
     public float Speed { get; private set; }
     
+    public float SurfaceHeight { get; private set; }
+    
     /// <summary>
     /// Read the water data from a byte array starting at offset
     /// </summary>
@@ -48,8 +50,10 @@ public class PrefabDataType11Water() : PrefabDataBase(11)
         Flags = blockData.Skip(offset + 0x2B).FirstOrDefault();
         SegmentPointsCount = BitConverter.ToInt32(blockData, offset + 0x6B);
         BorderPointsCount = BitConverter.ToInt32(blockData, offset + 0x77);
-        Depth = EndPos.Z - StartPos.Z; // BitConverter.ToInt32(blockData, offset + 0x6F);
+        Depth = Math.Abs(EndPos.Z - StartPos.Z); // BitConverter.ToInt32(blockData, offset + 0x6F);
         Speed = BitConverter.ToInt32(blockData, offset + 0x73);
+
+        SurfaceHeight = Math.Max(EndPos.Z, StartPos.Z);
 
         // TODO: Find out if there is a directional vector for water speed, or if uses the segment data for its direction
 

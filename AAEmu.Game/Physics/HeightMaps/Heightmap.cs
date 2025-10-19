@@ -12,12 +12,16 @@ public class Heightmap(float[,] heights, byte[,] materials)
     public float MaxHeight { get; } = heights.Cast<float>().Max();
 
     public float GetHeight(int x, int z) => Heights[x / 2, z / 2];
-    public byte GetMatarial(int x, int z) => Materials[x / 2, z / 2];
+    public byte GetMaterial(int x, int z) => Materials[x / 2, z / 2];
 
+    /// <summary>
+    /// Real world bounding box 
+    /// </summary>
+    /// <returns></returns>
     public JBoundingBox GetBoundingBox()
     {
         var min = new JVector(0, MinHeight, 0);
-        var max = new JVector(Width - 1, MaxHeight, Height - 1);
+        var max = new JVector((Width * 2) - 1, MaxHeight, (Height * 2) - 1);
         return new JBoundingBox(min, max);
     }
 }

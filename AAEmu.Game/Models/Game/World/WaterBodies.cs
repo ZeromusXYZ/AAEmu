@@ -65,7 +65,6 @@ public class WaterBodies
         lock (_lock)
         {
             var closestHeight = 1000000f;
-            WaterBodyArea closestArea = null; 
             foreach (var area in Areas)
                 if (area.GetSurface(point, out var surfacePoint, out var f))
                 {
@@ -74,11 +73,12 @@ public class WaterBodies
                     {
                         closestHeight = surfacePoint.Z;
                         flowDirection = f;
-                        closestArea = area;
                     }
                     // return surfacePoint.Z;
                 }
-            return closestHeight;
+
+            if (closestHeight < 1000000f)
+                return closestHeight;
         }
 
         return OceanLevel;
@@ -178,7 +178,7 @@ public class WaterBodies
                 // There is likely information related to river directions and speed in there
                 foreach (var v3 in water.BorderPointsList)
                 {
-                    var p = cellOffset + v3 with { Z = water.EndPos.Z };
+                    var p = cellOffset + v3 with { Z = water.SurfaceHeight };
                     if (!newLake.Points.Contains(p)) // Filter the duplicates
                         newLake.Points.Add(p);
                 }
@@ -195,7 +195,30 @@ public class WaterBodies
             }
             else if (water.SegmentPointsList.Count >= 2)
             {
-                // TODO: How to handle the in-shape values if border is not defined 
+                // TODO: How to handle the in-shape values if border is not defined
+                var newLake = new WaterBodyArea($"Segment_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
+                newLake.Depth = water.Depth; // water.EndPos.Z - water.StartPos.Z;
+                // TODO: check what the rest of DATA does before the vector array
+                // There is likely information related to river directions and speed in there
+                foreach (var v3 in water.SegmentPointsList)
+                {
+                    var p = cellOffset + v3 with { Z = water.SurfaceHeight };
+                    if (!newLake.Points.Contains(p)) // Filter the duplicates
+                        newLake.Points.Add(p);
+                }
+                // Close the loop
+                newLake.Points.Add(newLake.Points[0]);
+                newLake.UpdateBounds();
+                newLake.Speed = water.Speed;
+                lock (_lock)
+                {
+                    newLake.Id = (uint)Areas.Count;
+                    Areas.Add(newLake);
+                }
+            }
+            else
+            {
+                Logger.Warn($"Water without data found at Cell {worldCell.CellX:000}-{worldCell.CellY:000} prefab Idx: {prefabIdx}");
             }
 
             // Logger.Debug($"Added {newLake.Name} with {newLake.BorderPoints.Count} points");

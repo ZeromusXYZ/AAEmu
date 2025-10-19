@@ -101,38 +101,45 @@ public class PhysicsManager
         Logger.Debug($"{SimulationWorld.Template.Name} initializing terrain.");
         try
         {
-            var dataX = SimulationWorld.Template.CellX * WorldManager.CELL_HMAP_RESOLUTION;
-            var dataZ = SimulationWorld.Template.CellY * WorldManager.CELL_HMAP_RESOLUTION;
-            var hmapTerrain = new float[dataX, dataZ];
-            var hmapMaterials = new byte[dataX, dataZ];
-            var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
-            var cellCount = 0;
-            for (var cellY = 0; cellY < SimulationWorld.Template.CellY; cellY++)
+            if (SimulationWorld.Template.PhysicsHeightMap == null)
             {
-                for (var cellX = 0; cellX < SimulationWorld.Template.CellX; cellX++)
+                var dataX = SimulationWorld.Template.CellX * WorldManager.CELL_HMAP_RESOLUTION;
+                var dataZ = SimulationWorld.Template.CellY * WorldManager.CELL_HMAP_RESOLUTION;
+                var hmapTerrain = new float[dataX, dataZ];
+                var hmapMaterials = new byte[dataX, dataZ];
+                var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
+                var cellCount = 0;
+                for (var cellY = 0; cellY < SimulationWorld.Template.CellY; cellY++)
                 {
-                    cellCount++;
-                    var cell = SimulationWorld.Template.Cells[cellX, cellY];
-                    if (!cell.Loaded)
-                        continue; // ignore if not loaded
-                    for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
-                    for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
+                    for (var cellX = 0; cellX < SimulationWorld.Template.CellX; cellX++)
                     {
-                        var x = (cellX * WorldManager.CELL_HMAP_RESOLUTION) + inX;
-                        var y = (cellY * WorldManager.CELL_HMAP_RESOLUTION) + inY;
-                        hmapTerrain[x, y] = cell.GetHeightMapDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION, y % WorldManager.CELL_HMAP_RESOLUTION);
-                        hmapMaterials[x, y] = cell.GetMaterialsDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION, y % WorldManager.CELL_HMAP_RESOLUTION);
+                        cellCount++;
+                        var cell = SimulationWorld.Template.Cells[cellX, cellY];
+                        cell.VerifyCellLoaded();
+                        if (!cell.Loaded)
+                            continue; // ignore if not loaded
+                        var cellXOff = (cellX * WorldManager.CELL_HMAP_RESOLUTION);
+                        var cellYOff = (cellY * WorldManager.CELL_HMAP_RESOLUTION);
+                        for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
+                        for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
+                        {
+                            var x = cellXOff + inX;
+                            var y = cellYOff + inY;
+                            hmapTerrain[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                            hmapMaterials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
+                        }
                     }
+
+                    if (AppConfiguration.Instance.World.PreLoadTerrain && (cellY % 2 == 1))
+                        Logger.Debug($"Loading {SimulationWorld} heightmap data {(cellCount / cellCountMax * 100f):F0}%");
                 }
 
-                if (AppConfiguration.Instance.World.PreLoadTerrain && (cellY % 2 == 1))
-                    Logger.Debug($"Loading {SimulationWorld} heightmap data {(cellCount / cellCountMax * 100f):F0}%");
+                if (AppConfiguration.Instance.World.PreLoadTerrain)
+                    Logger.Debug($"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells into physics engine ");
+                var heightmap = new Heightmap(hmapTerrain, hmapMaterials);
+                SimulationWorld.Template.PhysicsHeightMap = heightmap;
             }
-
-            if (AppConfiguration.Instance.World.PreLoadTerrain)
-                Logger.Debug($"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells into physics engine ");
-            var heightmap = new Heightmap(hmapTerrain, hmapMaterials);
-            WorldHeightMapTester = new HeightmapTester(heightmap);
+            WorldHeightMapTester = new HeightmapTester(SimulationWorld.Template.PhysicsHeightMap);
             PhysWorld.BroadPhaseFilter = new HeightmapDetection(PhysWorld, WorldHeightMapTester);
             PhysWorld.DynamicTree.AddProxy(WorldHeightMapTester, false);
         }
