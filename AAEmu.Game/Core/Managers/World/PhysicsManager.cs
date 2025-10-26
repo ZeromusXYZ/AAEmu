@@ -128,6 +128,8 @@ public class PhysicsManager
                             hmapTerrain[x, y] = cell.GetHeightMapDataInCell(inX, inY);
                             hmapMaterials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
                         }
+                        if (cellX % 8 == 7)
+                            Logger.Debug($"Loading {SimulationWorld} heightmap data {(cellCount / cellCountMax * 100f):F0}% (c{cellX:000}_{cellY:000})");
                     }
 
                     if (AppConfiguration.Instance.World.PreLoadTerrain && (cellY % 2 == 1))

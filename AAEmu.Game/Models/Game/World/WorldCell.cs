@@ -124,7 +124,7 @@ public class WorldCell
             HeightMap = new float[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
             MaterialsMap = new byte[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
             // Load data
-            // LoadBaiFiles();
+            LoadBaiFiles();
             Loaded = LoadCellDataFromClient();
             Loading = false;
         }

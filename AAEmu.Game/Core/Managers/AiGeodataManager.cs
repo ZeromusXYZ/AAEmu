@@ -263,13 +263,16 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
     }
 
     /// <summary>
-    /// Gets height using navmesh data
+    /// Gets height using navmesh data using only type 4 node points
+    /// Falls back to regular heightmap if no points found and no maxDistanceAllowed is defined
     /// </summary>
     /// <param name="pos"></param>
     /// <param name="defaultHeight"></param>
+    /// <param name="maxDistanceAllowed"></param>
     /// <returns></returns>
-    public float GetHeight(Vector3 pos, float defaultHeight)
+    public float GetHeight(Vector3 pos, float defaultHeight, float maxDistanceAllowed = float.MaxValue)
     {
+        const float TargetTolerance = 0.1f;
         float res;
         //var stopWatch = new Stopwatch();
         //stopWatch.Start();
@@ -294,9 +297,9 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                             // Type 4 seems to represent "floating interior floors"
                             if (nodeDescriptor.Type != 4) // ignore regular floor points  
                                 continue;
-                            var floorDelta = worldTemplate.GetHeightMapHeight((int)MathF.Round(nodeDescriptor.Pos.X), (int)MathF.Round(nodeDescriptor.Pos.Y)) - nodeDescriptor.Pos.Z;
-                            if (double.Abs(floorDelta) > rawFloorDelta)
-                                continue; // Ignore this point if it's further from the actual floor
+                            //var floorDelta = worldTemplate.GetHeightMapHeight((int)MathF.Round(nodeDescriptor.Pos.X), (int)MathF.Round(nodeDescriptor.Pos.Y)) - nodeDescriptor.Pos.Z;
+                            //if (double.Abs(floorDelta) > rawFloorDelta)
+                            //    continue; // Ignore this point if it's further from the actual floor
 
                             var dist = (nodeDescriptor.Pos - pos).Length();
                             if (dist < closestDistance)
@@ -304,7 +307,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                                 closestDistance = dist;
                                 closestPoint = nodeDescriptor.Pos;
                                 // Slightly optimize if very close to target point
-                                if (closestDistance < 0.01f)
+                                if (closestDistance < TargetTolerance)
                                 {
                                     return closestPoint.Z;
                                 }
@@ -312,35 +315,17 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                         }
                     }
                 }
-
-                /*
-                if (bai.VertexMissionReaders.Count > 0)
-                {
-                    foreach (var vertexMission in bai.VertexMissionReaders)
-                    {
-                        foreach (var obstacleDataDescriptor in vertexMission.ObstacleDataDescriptorList)
-                        {
-                            var floorDelta = worldTemplate.GetRawHeightMapHeight((int)MathF.Round(obstacleDataDescriptor.Pos.X), (int)MathF.Round(obstacleDataDescriptor.Pos.Y)) - obstacleDataDescriptor.Pos.Z;
-                            if (double.Abs(floorDelta) < 0.25)
-                                continue; // Ignore this point if it's close to the floor
-
-                            var dist = (obstacleDataDescriptor.Pos - pos).Length();
-                            if (dist < closestDistance)
-                            {
-                                closestDistance = dist;
-                                closestPoint = obstacleDataDescriptor.Pos;
-                                // Slightly optimize if very close to target point
-                                if (closestDistance < 0.01f)
-                                {
-                                    return closestPoint.Z;
-                                }
-                            }
-                        }
-                    }
-                }
-                */
             }
-            
+
+            // If we defined a max range, compare to that
+            if (closestDistance < float.MaxValue)
+            {
+                // Check if it's outside the allowed range.
+                // Return zero if we had a max distance defined
+                return closestDistance > maxDistanceAllowed ? 0f : closestPoint.Z;
+            }
+
+            // If no point found, fall back to regular heightmap
             // Now compare to heightmap data
             if (closestDistance >= float.MaxValue) 
             {

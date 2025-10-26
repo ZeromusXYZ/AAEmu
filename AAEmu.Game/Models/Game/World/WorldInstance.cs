@@ -257,20 +257,47 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     /// <returns></returns>
     public float GetHeight(Vector3 pos)
     {
+        const float GeoCheckMaxDistance = 5f;
         // refPos to us as a starting point to find surface, we put this 2m higher that requested location
         // to take into account possible model clipping
         var refPos = pos with { Z = pos.Z + 2f };
+        var hMapRes = 0f;
         // First try using physics engine
         if (Physics is { WorldHeightMapTester: not null })
-            return GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
+        {
+            hMapRes = GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
+        }
 
-        // Fallback to normal heightmap.dat only data
-        var target = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
-        if (target > 0f)
-            return target;
+        // Check the netmission0.bai files node descriptors
+        var netMissionNodeDescriptorsRes = Template.GeoData?.GetHeight(refPos, pos.Z, GeoCheckMaxDistance) ?? 0f;
 
-        // Last resort using .bai files mesh
-        return Template.GeoData?.GetHeight(refPos, pos.Z) ?? 0f;
+        // If no heightmap hit, and no geo data hit, then just return the heightmap
+        if ((hMapRes >= 0f) && (netMissionNodeDescriptorsRes <= 0f))
+        {
+            return hMapRes;
+        }
+
+        // We are on a heightmap hole, try to use the geo data
+        if ((hMapRes <= 0f) && (netMissionNodeDescriptorsRes > 0f))
+        {
+            return netMissionNodeDescriptorsRes;
+        }
+
+        // If both return a result, then determine the one that's best fit
+        if ((hMapRes > 0f) && (netMissionNodeDescriptorsRes > 0f))
+        {
+            var deltaH = Math.Abs(pos.Z - hMapRes);
+            var deltaG = Math.Abs(pos.Z - netMissionNodeDescriptorsRes);
+            // Apply preference modifiers by height checks, slight bias towards downwards
+            deltaH = pos.Z >= hMapRes ? deltaH * 0.9f : deltaH * 1.1f; 
+            deltaG = pos.Z >= netMissionNodeDescriptorsRes ? deltaG * 0.9f : deltaG * 1.1f;
+            return deltaG < deltaH ? netMissionNodeDescriptorsRes : hMapRes;
+        }
+        
+        
+        // Fallback to the old heightmap.dat data method
+        hMapRes = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
+        return hMapRes;
     }
 
     public float GetReferenceHeight(NpcAi ai, Vector3 pos, uint zoneId)

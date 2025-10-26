@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Numerics;
 using AAEmu.Commons.Exceptions;
 using NLog;
@@ -13,9 +13,17 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
     private WorldTemplate ParentWorldTemplate { get; } = parentWorldTemplate;
+
+    public bool LoadAreasMission { get; set; } = false;
     public List<AreasMissionReader> AreasMissionReaders { get; } = [];
+
+    public bool LoadNetMission { get; set; } = true;
     public List<NetMissionReader> NetMissionReaders { get; } = [];
+
+    public bool LoadVertexMission { get; set; } = false;
     public List<VertexMissionReader> VertexMissionReaders { get; } = [];
+
+    public bool LoadHideMission { get; set; } = false;
     public List<NetMissionReader> HideMissionReaders { get; } = [];
 
     /// <summary>
@@ -31,159 +39,160 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
         if (!additiveLoad)
             ClearData();
 
-        Logger.Debug($"LoadBaiFilesFromFolder {zoneOrPathsFolder}");
+        // Logger.Debug($"LoadBaiFilesFromFolder {zoneOrPathsFolder}");
         try
         {
             // AreasMission*.bai
-            var areaFiles = GetFiles("areasmission*.bai", zoneOrPathsFolder);
-            foreach (var areaFile in areaFiles)
+            if (LoadAreasMission)
             {
-                // Try to get zone key from folder name
-                var areaFolderName = Path.GetFileName(Path.GetDirectoryName(areaFile)) ?? "";
-
-                if (string.IsNullOrWhiteSpace(areaFolderName))
-                    continue;
-
-                // Skip file if it doesn't exist anymore for whatever reason
-                if (!ClientFileManager.FileExists(areaFile))
-                    continue;
-
-                //LabelLoading.Text = $"Areas: {fileIndex}/{areaFiles.Length}";
-                //LabelLoading.Refresh();
-
-                var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(areaFolderName);
-                var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
-
-                // Logger.Debug($"Areas File: {areaFile}");
-
-                // Load all .bai files for data
-                var fileStream = ClientFileManager.GetFileStream(areaFile);
-                // Ignore files that are too small or null streams
-                if (fileStream == null || fileStream.Length <= 20)
+                var areaFiles = GetFiles("areasmission*.bai", zoneOrPathsFolder);
+                foreach (var areaFile in areaFiles)
                 {
-                    fileStream?.Dispose();
-                    continue;
-                }
+                    // Try to get zone key from folder name
+                    var areaFolderName = Path.GetFileName(Path.GetDirectoryName(areaFile)) ?? "";
 
-                try
-                {
-                    var area = new AreasMissionReader(fileStream, zoneKey);
-                    area.ReaderPointOffset = targetOffset;
-                    area.ReadFile();
-                    AreasMissionReaders.Add(area);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Debug($"Areas File Exception: {ex}, in {areaFile}, area offset {targetOffset}, skipping the rest of this file");
-                }
-                finally
-                {
-                    fileStream.Dispose();
+                    if (string.IsNullOrWhiteSpace(areaFolderName))
+                        continue;
+
+                    // Skip file if it doesn't exist anymore for whatever reason
+                    if (!ClientFileManager.FileExists(areaFile))
+                        continue;
+
+                    //LabelLoading.Text = $"Areas: {fileIndex}/{areaFiles.Length}";
+                    //LabelLoading.Refresh();
+
+                    var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(areaFolderName);
+                    var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
+
+                    // Logger.Debug($"Areas File: {areaFile}");
+
+                    // Load all .bai files for data
+                    using var fs = ClientFileManager.GetFileStream(areaFile);
+                    // Ignore files that are too small
+                    if (fs.Length <= 20)
+                        continue;
+
+                    var area = new AreasMissionReader(fs, zoneKey);
+                    try
+                    {
+                        area.ReaderPointOffset = targetOffset;
+                        area.ReadFile();
+                        AreasMissionReaders.Add(area);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug(
+                            $"Areas File Exception: {ex}, in {areaFile}, area offset {targetOffset}, skipping the rest of this file");
+                        // continue;
+                    }
                 }
             }
 
             // NetMission*.bai
-            var netFiles = GetFiles("netmission*.bai", zoneOrPathsFolder);
-            foreach (var netFile in netFiles)
+            if (LoadNetMission)
             {
-                // Try to get zone key from folder name
-                var netFolderName = Path.GetFileName(Path.GetDirectoryName(netFile)) ?? "";
-
-                if (string.IsNullOrWhiteSpace(netFolderName))
-                    continue;
-
-                //LabelLoading.Text = $"Net: {fileIndex}/{netFiles.Length}";
-                //LabelLoading.Refresh();
-
-                var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(netFolderName);
-                var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
-
-                // Logger.Debug($"Net File: {netFile}");
-
-                using var fs = ClientFileManager.GetFileStream(netFile);
-                var net = new NetMissionReader(fs, zoneKey);
-                try
+                var netFiles = GetFiles("netmission*.bai", zoneOrPathsFolder);
+                foreach (var netFile in netFiles)
                 {
-                    net.ReaderPointOffset = targetOffset;
-                    net.ReadFile();
-                    NetMissionReaders.Add(net);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Debug($"Net File Exception: {ex}, in {netFile}");
-                    // continue;
+                    // Try to get zone key from folder name
+                    var netFolderName = Path.GetFileName(Path.GetDirectoryName(netFile)) ?? "";
+
+                    if (string.IsNullOrWhiteSpace(netFolderName))
+                        continue;
+
+                    //LabelLoading.Text = $"Net: {fileIndex}/{netFiles.Length}";
+                    //LabelLoading.Refresh();
+
+                    var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(netFolderName);
+                    var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
+
+                    // Logger.Debug($"Net File: {netFile}");
+
+                    using var fs = ClientFileManager.GetFileStream(netFile);
+                    var net = new NetMissionReader(fs, zoneKey);
+                    try
+                    {
+                        net.ReaderPointOffset = targetOffset;
+                        net.ReadFile();
+                        NetMissionReaders.Add(net);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug($"Net File Exception: {ex}, in {netFile}");
+                        // continue;
+                    }
                 }
             }
 
             // VertexMission*.bai
-            var vertexFiles = GetFiles("vertsmission*.bai", zoneOrPathsFolder);
-            foreach (var vertexFile in vertexFiles)
+            if (LoadVertexMission)
             {
-                // Try to get zone key from folder name
-                var vertexFolderName = Path.GetFileName(Path.GetDirectoryName(vertexFile)) ?? "";
-
-                if (string.IsNullOrWhiteSpace(vertexFolderName))
-                    continue;
-
-                //LabelLoading.Text = $"Vertex: {fileIndex}/{vertexFiles.Length}";
-                //LabelLoading.Refresh();
-
-                var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(vertexFolderName);
-                var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
-
-                // Logger.Debug($"Vertex File: {vertexFile}");
-
-                var fileStream = ClientFileManager.GetFileStream(vertexFile);
-                if (fileStream == null)
-                    continue;
-
-                try
+                var vertexFiles = GetFiles("vertsmission*.bai", zoneOrPathsFolder);
+                foreach (var vertexFile in vertexFiles)
                 {
-                    var vertex = new VertexMissionReader(fileStream, zoneKey);
-                    vertex.ReaderPointOffset = targetOffset;
-                    vertex.ReadFile();
-                    VertexMissionReaders.Add(vertex);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Debug($"Vertex File Exception: {ex}, in {vertexFile}");
-                }
-                finally
-                {
-                    fileStream.Dispose();
+                    // Try to get zone key from folder name
+                    var vertexFolderName = Path.GetFileName(Path.GetDirectoryName(vertexFile)) ?? "";
+
+                    if (string.IsNullOrWhiteSpace(vertexFolderName))
+                        continue;
+
+                    //LabelLoading.Text = $"Vertex: {fileIndex}/{vertexFiles.Length}";
+                    //LabelLoading.Refresh();
+
+                    var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(vertexFolderName);
+                    var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
+
+                    // Logger.Debug($"Vertex File: {vertexFile}");
+
+                    using var fs = ClientFileManager.GetFileStream(vertexFile);
+                    var vertex = new VertexMissionReader(fs, zoneKey);
+                    try
+                    {
+                        vertex.ReaderPointOffset = targetOffset;
+                        vertex.ReadFile();
+                        VertexMissionReaders.Add(vertex);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug($"Vertex File Exception: {ex}, in {vertexFile}");
+                        // continue;
+                    }
                 }
             }
 
             // HideMission*.bai
-            var hideFiles = GetFiles("hidemission*.bai", zoneOrPathsFolder);
-            foreach (var hideFile in hideFiles)
+            if (LoadHideMission)
             {
-                // Try to get zone key from folder name
-                var hideFolderName = Path.GetFileName(Path.GetDirectoryName(hideFile)) ?? "";
-
-                if (string.IsNullOrWhiteSpace(hideFolderName))
-                    continue;
-
-                //LabelLoading.Text = $"Hide: {fileIndex}/{hideFiles.Length}";
-                //LabelLoading.Refresh();
-
-                var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(hideFolderName);
-                var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
-
-                // Logger.Debug($"Hide File: {hideFile}");
-
-                using var fs = ClientFileManager.GetFileStream(hideFile);
-                var hide = new NetMissionReader(fs, zoneKey);
-                try
+                var hideFiles = GetFiles("hidemission*.bai", zoneOrPathsFolder);
+                foreach (var hideFile in hideFiles)
                 {
-                    hide.ReaderPointOffset = targetOffset;
-                    hide.ReadFile();
-                    HideMissionReaders.Add(hide);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Debug($"Hide File Exception: {ex}, in {hideFile}");
-                    // continue;
+                    // Try to get zone key from folder name
+                    var hideFolderName = Path.GetFileName(Path.GetDirectoryName(hideFile)) ?? "";
+
+                    if (string.IsNullOrWhiteSpace(hideFolderName))
+                        continue;
+
+                    //LabelLoading.Text = $"Hide: {fileIndex}/{hideFiles.Length}";
+                    //LabelLoading.Refresh();
+
+                    var (zoneKey, pathBlockX, pathBlockY) = GetZoneAndOffsetsByName(hideFolderName);
+                    var targetOffset = GetTargetOffsetByZoneOrPath(zoneKey, pathBlockX, pathBlockY);
+
+                    // Logger.Debug($"Hide File: {hideFile}");
+
+                    using var fs = ClientFileManager.GetFileStream(hideFile);
+                    var hide = new NetMissionReader(fs, zoneKey);
+                    try
+                    {
+                        hide.ReaderPointOffset = targetOffset;
+                        hide.ReadFile();
+                        HideMissionReaders.Add(hide);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug($"Hide File Exception: {ex}, in {hideFile}");
+                        // continue;
+                    }
                 }
             }
 

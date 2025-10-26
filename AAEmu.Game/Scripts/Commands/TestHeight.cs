@@ -12,6 +12,7 @@ using AAEmu.Game.Utils;
 using AAEmu.Game.Utils.Scripts;
 using Jitter2.Collision;
 using Jitter2.LinearMath;
+using NLog.Targets;
 
 namespace AAEmu.Game.Scripts.Commands;
 
@@ -19,7 +20,8 @@ public enum TestHeightMode : byte
 {
     HeightMap,
     BaiData,
-    RayCast
+    RayCast,
+    System
 }
 
 public class TestHeight : ICommand
@@ -53,21 +55,14 @@ public class TestHeight : ICommand
     {
         switch (mode)
         {
+            case TestHeightMode.System:
+                return world.GetHeight(pos);
             case TestHeightMode.HeightMap:
                 return world.GetHeightUsingHeightMapDat(pos.X, pos.Y);
             case TestHeightMode.BaiData:
                 return world.Template.GeoData.GetHeight(pos, pos.Z);
             case TestHeightMode.RayCast:
                 return world.GetHeightByRayCastOnHeightMapOnly(pos, pos.Z);
-                /*
-                var ceiling = 10000f;
-                var rayStart = pos.ToJVector() with { Y = ceiling };
-                if (world.Physics.PhysWorld.DynamicTree.RayCast(rayStart, -JVector.UnitY, ceiling, null, null,
-                        out var proxy, out var normal, out var lambda))
-                    return ceiling - lambda;
-                else
-                    return 0f;//pos.Z;
-                */
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
         }
@@ -82,9 +77,11 @@ public class TestHeight : ICommand
             targetPlayer = WorldManager.Instance.GetTargetOrSelf(character, args[0], out firstarg);
         }
 
-        var heightMode = TestHeightMode.HeightMap;
+        var heightMode = TestHeightMode.System;
         foreach (var s in args)
         {
+            if (s.ToLower() == "sys")
+                heightMode = TestHeightMode.System;
             if (s.ToLower() == "map")
                 heightMode = TestHeightMode.HeightMap;
             if (s.ToLower() == "geo")
