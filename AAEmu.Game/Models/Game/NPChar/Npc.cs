@@ -1411,6 +1411,8 @@ public partial class Npc : Unit
         resList.Add(abuser.Transform.World.Position);
         var reducedPath = hasDifferentTypes ? new Queue<Vector3>(resList) : ParentWorld.Template.GeoData.ReducePath(resList, 5);
         Ai.PathNode.FoundPath = reducedPath;
+        /*
+        // Send path debug information to the player that has been targetted
         if (abuser is Character player)
         {
             player.SendMessage($"Aggro from {Ai.Owner.ObjId}, getting attack path in {Ai.PathNode.FoundPath.Count}/{resList.Count} steps");
@@ -1419,6 +1421,7 @@ public partial class Npc : Unit
                 player.SendMessage($"Path step -> {v3}");
             }
         }
+        */
     }
 
     /// <summary>

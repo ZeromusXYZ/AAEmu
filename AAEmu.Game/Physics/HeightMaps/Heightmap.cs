@@ -2,7 +2,7 @@
 
 namespace AAEmu.Game.Physics.HeightMaps;
 
-public class Heightmap(float[,] heights, byte[,] materials)
+public class Heightmap(ref float[,] heights, ref byte[,] materials)
 {
     public float[,] Heights { get; init; } = heights;
     public byte[,] Materials { get; init; } = materials;

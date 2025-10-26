@@ -4,6 +4,7 @@ using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.Utils;
 using AAEmu.Game.Utils.Scripts;
 
 namespace AAEmu.Game.Scripts.Commands;
@@ -629,10 +630,21 @@ public class Teleport : ICommand
                 }
                 else
                 {
-                    var height = character.ParentWorld.GetHeight(new Vector3(
+                    // Target check location
+                    var tpPos = new Vector3(
                         character.LocalPingPosition.X,
                         character.LocalPingPosition.Y,
-                        5000f)); // WorldManager.Instance.GetHeight(character.Transform.ZoneId, character.LocalPingPosition.X, character.LocalPingPosition.Y, character.LocalPingPosition.Z);
+                        5000f);
+                    // Make sure target cell has been loaded, else we can't do height check
+                    var targetCellIndex = tpPos.ToCellIndex();
+                    var targetCell = character.ParentWorld.Template.GetCell(targetCellIndex.Item1, targetCellIndex.Item2);
+                    if (targetCell != null)
+                    {
+                        targetCell.VerifyCellLoaded();
+                    }
+
+                    // Check target teleport point's location
+                    var height = character.ParentWorld.GetHeight(tpPos); // WorldManager.Instance.GetHeight(character.Transform.ZoneId, character.LocalPingPosition.X, character.LocalPingPosition.Y, character.LocalPingPosition.Z);
                     if (height == 0f)
                     {
                         CommandManager.SendNormalText(this,

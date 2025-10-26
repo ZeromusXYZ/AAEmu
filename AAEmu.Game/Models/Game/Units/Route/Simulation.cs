@@ -280,7 +280,7 @@ public class Simulation : Patrol
 
         if (Path.Count == 0)
         {
-            Logger.Warn($"Stop moving... Информация о пути MoveFileName={MoveFileName} отсутствует!");
+            Logger.Warn($"Stop moving... path information missing! MoveFileName={MoveFileName}");
             return;
         }
 
@@ -324,7 +324,7 @@ public class Simulation : Patrol
 
         if (Path.Count == 0)
         {
-            Logger.Warn($"Stop moving... Информация о пути MoveFileName={MoveFileName} отсутствует!");
+            Logger.Warn($"Stop moving... path information missing! MoveFileName={MoveFileName}");
             return;
         }
 

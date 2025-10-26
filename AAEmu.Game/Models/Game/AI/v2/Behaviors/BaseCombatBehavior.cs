@@ -144,8 +144,8 @@ public abstract class BaseCombatBehavior : Behavior
                     Ai.Owner.FindPath((Unit)target);
                     stopWatch.Stop();
                     // Toss warning if it took a long time
-                    if (stopWatch.Elapsed.Ticks >= TimeSpan.TicksPerMillisecond)
-                        Logger.Warn($"FindPath took {stopWatch.Elapsed} for Ai.Owner.ObjId:{Ai.Owner.ObjId}, Owner.TemplateId {Ai.Owner.TemplateId} @ {Ai.Owner.Transform}");
+                    //if (stopWatch.Elapsed.Ticks >= TimeSpan.TicksPerMillisecond)
+                    //    Logger.Warn($"FindPath took {stopWatch.Elapsed} for Ai.Owner.ObjId:{Ai.Owner.ObjId}, Owner.TemplateId {Ai.Owner.TemplateId} @ {Ai.Owner.Transform}");
                     // Save the target's new coordinates
                     Ai.PathNode.EndPointPos =  new Vector3(target.Transform.World.Position.X, target.Transform.World.Position.Y, target.Transform.World.Position.Z);
                 }

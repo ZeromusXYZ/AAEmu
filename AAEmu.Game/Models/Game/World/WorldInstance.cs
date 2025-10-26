@@ -257,7 +257,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     /// <returns></returns>
     public float GetHeight(Vector3 pos)
     {
-        const float GeoCheckMaxDistance = 5f;
+        const float GeoCheckMaxDistance = 3f;
         // refPos to us as a starting point to find surface, we put this 2m higher that requested location
         // to take into account possible model clipping
         var refPos = pos with { Z = pos.Z + 2f };
