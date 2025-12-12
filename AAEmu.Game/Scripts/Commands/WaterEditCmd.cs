@@ -80,7 +80,7 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
     {
         return CallPrefix;
     }
-        
+
     public static void CreateNearbyList(ICharacter character, WorldInstance worldInstance)
     {
         NearbyList.Clear();
@@ -88,12 +88,10 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
         {
             foreach (var area in worldInstance.Water.Areas)
             {
-                foreach (var area in worldInstance.Water.Areas)
-                {
-                    if (area.Points.Count < 1)
-                        continue;
-                    var offsetVec = area.Points[0] - character.Transform.World.Position;
-                    var dist = offsetVec.Length();
+                if (area.Points.Count < 1)
+                    continue;
+                var offsetVec = area.Points[0] - character.Transform.World.Position;
+                var dist = offsetVec.Length();
 
                 if (NearbyList.Count <= 0)
                 {
@@ -116,7 +114,7 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
             }
         }
     }
-        
+
     public static void ShowSelectedArea(ICharacter character, bool clearOldMarkers = true, bool useVirtualBorder = false)
     {
         var bottomDoodadId = 4763u; // Crescent Throne Flag 
@@ -128,28 +126,27 @@ public class WaterEditCmd : SubCommandBase, ICommand, ICommandV2
         {
             foreach (var marker in Markers)
             {
-                foreach (var marker in Markers)
+                if (marker is Doodad doodad)
                 {
-                    if (marker is Doodad doodad)
-                    {
-                        if (doodad.Spawner != null)
-                            doodad.Spawner.Id = 0xffffffff;// removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
-                        doodad.Hide();
-                    }
-                    else if (marker is Npc npc)
-                    {
-                        if (npc.Spawner != null)
-                            npc.Spawner.Id = 0xffffffff;// removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
-                        npc.Hide();
-                    }
-                    else
-                    {
-                        ObjectIdManager.Instance.ReleaseId(marker.ObjId);
-                        marker.Delete();
-                    }
+                    if (doodad.Spawner != null)
+                        doodad.Spawner.Id =
+                            0xffffffff; // removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
+                    doodad.Hide();
                 }
-                Markers.Clear();
+                else if (marker is Npc npc)
+                {
+                    if (npc.Spawner != null)
+                        npc.Spawner.Id =
+                            0xffffffff; // removed from the game manually (укажем, что не надо сохранять в файл doodad_spawns_new.json командой /save all)
+                    npc.Hide();
+                }
+                else
+                {
+                    ObjectIdManager.Instance.ReleaseId(marker.ObjId);
+                    marker.Delete();
+                }
             }
+
             Markers.Clear();
         }
 
