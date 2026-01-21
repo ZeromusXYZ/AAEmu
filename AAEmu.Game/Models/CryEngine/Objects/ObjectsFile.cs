@@ -15,7 +15,7 @@ public class ObjectsFile(string fileName)
 
     public string FileName { get; init; } = fileName;
     public List<AssetPath> AssetPathsList { get; set; } = [];
-    public List<PrefabDataBase> PrefabsList { get; set; } = [];
+    public List<ObjectDataBase> PrefabsList { get; set; } = [];
 
     public bool ReadFile()
     {
@@ -159,14 +159,15 @@ public class ObjectsFile(string fileName)
     /// </summary>
     /// <param name="objectType"></param>
     /// <returns></returns>
-    private PrefabDataBase GetPrefabReader(int objectType)
+    private ObjectDataBase GetPrefabReader(int objectType)
     {
         switch (objectType)
         {
-            case 6: return new PrefabDataType6Voxel();
-            case 11: return new PrefabDataType11Water();
-            case 13: return new PrefabDataType13Road();
-            default: return new PrefabDataBase(objectType);
+            case 1: return new ObjectDataType1Brush();
+            case 6: return new ObjectDataType6Voxel();
+            case 11: return new ObjectDataType11Water();
+            case 13: return new ObjectDataType13Road();
+            default: return new ObjectDataBase(objectType);
         }
     }
 

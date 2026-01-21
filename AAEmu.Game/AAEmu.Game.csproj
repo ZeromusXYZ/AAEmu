@@ -78,6 +78,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="BCnEncoder.Net" />
     <PackageReference Include="Discord.Net" />
     <PackageReference Include="Jace" />
     <PackageReference Include="Jitter2" />
@@ -94,6 +95,8 @@
     <PackageReference Include="NLog" />
     <PackageReference Include="NLua" />
     <PackageReference Include="OSVersionExt.NetStd" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="System.IO.Hashing" />
   </ItemGroup>
  
 </Project>

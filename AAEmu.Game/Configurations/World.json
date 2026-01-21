@@ -14,6 +14,7 @@
         "GodMode": false,
         "GeoDataMode": true,
         "PreLoadTerrain": false,
+        "LoadBrushModels": true,
         "MaxInstances": 32,
         "TargetPhysicsTps": 25.0,
         "ActabilityRate": 1.0

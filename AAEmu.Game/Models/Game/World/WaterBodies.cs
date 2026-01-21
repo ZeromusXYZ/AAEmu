@@ -165,7 +165,7 @@ public class WaterBodies
         foreach (var prefab in worldCell.LoadedObjectDat.PrefabsList)
         {
             prefabIdx++;
-            if (prefab is not PrefabDataType11Water water)
+            if (prefab is not ObjectDataType11Water water)
                 continue;
 
             // Does this water body have a border defined?

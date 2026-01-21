@@ -83,6 +83,11 @@ public class WorldConfig
     public bool PreLoadTerrain { get; set; }
 
     /// <summary>
+    /// Enable the loading of level model geometry to have more accurate collision for AI and Skills
+    /// </summary>
+    public bool LoadBrushModels { get; set; } 
+
+    /// <summary>
     /// Maximum number of instances that can be created (includes system instances)
     /// </summary>
     public uint MaxInstances { get; set; } = 32;

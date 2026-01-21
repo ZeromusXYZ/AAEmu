@@ -27,6 +27,7 @@ public class WorldCell
     private float MaxHeight { get; set; }
     public Hmap LoadedHmap { get; private set; }
     public ObjectsFile LoadedObjectDat { get; set; }
+    public VisAreasFile LoadedVisAreasDat { get; set; }
 
     /// <summary>
     /// Bai files data to use in this cell
@@ -227,6 +228,24 @@ public class WorldCell
                 LoadedObjectDat = objects;
                 if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0)
                     Logger.Error($"Error loading objects from {objectDatFile}, only {objects.AssetPathsList.Count} assets and {objects.PrefabsList.Count} prefabs read");
+            }
+        }
+
+        // Load visareas.dat file
+        var visAreasDatFile = Path.Combine(cellFolder, "client", "visareas.dat");
+        if (ClientFileManager.FileExists(visAreasDatFile))
+        {
+            var objects = new VisAreasFile(visAreasDatFile);
+            if (objects.ReadFile())
+            {
+                LoadedVisAreasDat = objects;
+                // Logger.Debug($"Loaded objects from {objectDatFile}");
+            }
+            else
+            {
+                LoadedVisAreasDat = objects;
+                if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0 || objects.VisAreas.Count > 0)
+                    Logger.Error($"Error loading objects from {visAreasDatFile}, only {objects.AssetPathsList.Count} assets, {objects.PrefabsList.Count} prefabs and {objects.VisAreas.Count} visareas read");
             }
         }
 
