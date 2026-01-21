@@ -235,17 +235,17 @@ public class WorldCell
         var visAreasDatFile = Path.Combine(cellFolder, "client", "visareas.dat");
         if (ClientFileManager.FileExists(visAreasDatFile))
         {
-            var objects = new VisAreasFile(visAreasDatFile);
-            if (objects.ReadFile())
+            var visObjects = new VisAreasFile(visAreasDatFile);
+            if (visObjects.ReadFile())
             {
-                LoadedVisAreasDat = objects;
+                LoadedVisAreasDat = visObjects;
                 // Logger.Debug($"Loaded objects from {objectDatFile}");
             }
             else
             {
-                LoadedVisAreasDat = objects;
-                if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0 || objects.VisAreas.Count > 0)
-                    Logger.Error($"Error loading objects from {visAreasDatFile}, only {objects.AssetPathsList.Count} assets, {objects.PrefabsList.Count} prefabs and {objects.VisAreas.Count} visareas read");
+                LoadedVisAreasDat = visObjects;
+                if (visObjects.AssetPathsList.Count > 0 || visObjects.PrefabsList.Count > 0 || visObjects.VisAreas.Count > 0)
+                    Logger.Error($"Error loading objects from {visAreasDatFile}, only {visObjects.AssetPathsList.Count} assets, {visObjects.PrefabsList.Count} prefabs and {visObjects.VisAreas.Count} visareas read");
             }
         }
 
@@ -330,6 +330,7 @@ public class WorldCell
         fs.Close();
     }
 #endif
+
     public Vector3 GetCellWorldOffset()
     {
         return new Vector3(CellX * WorldManager.CELL_SIZE, CellY * WorldManager.CELL_SIZE, 0f);

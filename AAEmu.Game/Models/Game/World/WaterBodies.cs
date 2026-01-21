@@ -158,21 +158,56 @@ public class WaterBodies
 
     public void AddFromCellData(WorldCell worldCell)
     {
-        var prefabIdx = 0;
-        if (worldCell?.LoadedObjectDat == null)
+        if (worldCell == null)
             return;
         var cellOffset = worldCell.GetCellWorldOffset();
-        foreach (var prefab in worldCell.LoadedObjectDat.PrefabsList)
+
+        var prefabIdx = 0;
+        if (worldCell.LoadedObjectDat != null)
         {
-            prefabIdx++;
-            if (prefab is not ObjectDataType11Water water)
-                continue;
+            foreach (var prefab in worldCell.LoadedObjectDat.PrefabsList)
+            {
+                prefabIdx++;
+                AddObjectDataFromWorldCell(prefab, cellOffset, worldCell, prefabIdx);
+            }
+        }
+
+        // As a game server we won't bother to only load the data from inside visareas when needed.
+        // Instead, we always load it directly with the normal cell objects regardless if it's needed or not
+        if (worldCell.LoadedVisAreasDat != null)
+        {
+            prefabIdx = 1_000_000; // Should be 0, but will make it easier to debug
+            foreach (var prefab in worldCell.LoadedVisAreasDat.PrefabsList)
+            {
+                prefabIdx++;
+                AddObjectDataFromWorldCell(prefab, cellOffset, worldCell, prefabIdx);
+            }
+            // We currently don't do anything with the actual visareas and portal boxes
+        }
+        
+    }
+
+    private void AddObjectDataFromWorldCell(ObjectDataBase prefab, Vector3 cellOffset, WorldCell worldCell, int prefabIdx)
+    {
+        if (prefab is ObjectDataType1Brush brush)
+        {
+            // TODO: load model and add to physics world
+            return;
+        }
+        if (prefab is ObjectDataType6Voxel voxel)
+        {
+            // TODO: Create voxel terrain and add to physics world
+            return;
+        }
+        if (prefab is ObjectDataType11Water water)
+        {
 
             // Does this water body have a border defined?
             // If yes, use its shape
             if (water.BorderPointsList.Count >= 2)
             {
-                var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
+                var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}",
+                    WaterBodyAreaType.Polygon);
                 newLake.Depth = water.Depth; // water.EndPos.Z - water.StartPos.Z;
                 // TODO: check what the rest of DATA does before the vector array
                 // There is likely information related to river directions and speed in there
@@ -182,6 +217,7 @@ public class WaterBodies
                     if (!newLake.Points.Contains(p)) // Filter the duplicates
                         newLake.Points.Add(p);
                 }
+
                 // Close the loop
                 newLake.Points.Add(newLake.Points[0]);
 
@@ -206,6 +242,7 @@ public class WaterBodies
                     if (!newLake.Points.Contains(p)) // Filter the duplicates
                         newLake.Points.Add(p);
                 }
+
                 // Close the loop
                 newLake.Points.Add(newLake.Points[0]);
                 newLake.UpdateBounds();
@@ -220,8 +257,7 @@ public class WaterBodies
             {
                 Logger.Warn($"Water without data found at Cell {worldCell.CellX:000}-{worldCell.CellY:000} prefab Idx: {prefabIdx}");
             }
-
-            // Logger.Debug($"Added {newLake.Name} with {newLake.BorderPoints.Count} points");
+            // return;
         }
     }
 }

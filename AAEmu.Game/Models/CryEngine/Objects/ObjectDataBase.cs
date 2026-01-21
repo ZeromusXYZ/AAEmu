@@ -5,15 +5,22 @@ namespace AAEmu.Game.Models.CryEngine.Objects;
 
 public class ObjectDataBase(int prefabType)
 {
-    public static Dictionary<int, int> ObjectTotalSizesByType { get; } = new()
+    private static Dictionary<int, int> ObjectTotalSizesByType { get; } = new()
     {
         {1, 132},  // Brushes
         {2, 68},   // Vegetation
         {4, 100},  // 
         {5, 124},  //
+                   // Voxel (type 6) is variable size
+                   // 7?
         {8, 196},  //
         {9, 115},  // Decal
+                   // 10?
+                   // Water (type 11) is variable size
+                   // 12?
+                   // Roads (type 13) is variable size
         {14, 83},  // Distance Clouds
+                   // 15 ... 26?
         {27, 652}, // 
     };
 

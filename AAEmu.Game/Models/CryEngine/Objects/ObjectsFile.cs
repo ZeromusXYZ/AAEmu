@@ -11,8 +11,6 @@ public class ObjectsFile(string fileName)
     private static Logger Logger = LogManager.GetCurrentClassLogger();
     private const uint NodeHeaderSize = 33;
 
-    
-
     public string FileName { get; init; } = fileName;
     public List<AssetPath> AssetPathsList { get; set; } = [];
     public List<ObjectDataBase> PrefabsList { get; set; } = [];
