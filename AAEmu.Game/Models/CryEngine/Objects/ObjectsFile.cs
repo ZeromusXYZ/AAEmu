@@ -191,6 +191,13 @@ public class ObjectsFile(string fileName)
             if (totalObjectSize > 0)
             {
                 PrefabsList.Add(prefab);
+                /*
+                if ((FileName == "game\\worlds\\main_world\\cells\\021_008\\client\\object.dat") &&
+                    (PrefabsList.Count == 2442))
+                {
+                    // Break it
+                }
+                */
             }
             else
             {

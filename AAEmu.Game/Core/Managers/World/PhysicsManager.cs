@@ -9,6 +9,7 @@ using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models;
 using AAEmu.Game.Models.ClientData;
+using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Units;
 using AAEmu.Game.Models.Game.Units.Movements;
@@ -753,6 +754,48 @@ public class PhysicsManager
             if (cell == null)
                 continue;
             SimulationWorld.Water.AddFromCellData(cell);
+        }
+    }
+
+    private void AddVoxelTerrain(WorldCell cell, ObjectDataType6Voxel voxel)
+    {
+        var cellOffset = cell.GetCellWorldOffset();
+        // TODO: Generate terrain mesh
+    }
+
+    public void AddVoxelTerrain(WorldCell worldCell)
+    {
+        if (worldCell == null)
+            return;
+
+        // Main objects list
+        if (worldCell.LoadedObjectDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedObjectDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType6Voxel voxel)
+                {
+                    if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
+                    {
+                        AddVoxelTerrain(worldCell, voxel);
+                    }
+                }
+            }
+        }
+
+        // Objects list in visareas
+        if (worldCell.LoadedVisAreasDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedVisAreasDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType6Voxel voxel)
+                {
+                    if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
+                    {
+                        AddVoxelTerrain(worldCell, voxel);
+                    }
+                }
+            }
         }
     }
 }

@@ -250,12 +250,12 @@ public class WorldCell
         }
 
         // Update Physics world's heightmaps
-        // TODO: Merge local heightmap into physics engine
         foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id))
         {
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
             // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
             worldInstance.Water.AddFromCellData(this);
+            worldInstance.Physics?.AddVoxelTerrain(this);
         }
         
 #if EXPORT_CELL_ON_LOAD

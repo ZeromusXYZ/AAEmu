@@ -52,104 +52,108 @@ public class ObjectDataType6Voxel() : ObjectDataBase(6)
                (ignoreZ || (point.Z >= BoundingBoxMin.Z && point.Z <= BoundingBoxMax.Z));
     }
 
-    public bool ReadData()
+    public override int ReadData(byte[] blockData, int offset)
     {
         try
         {
+            var numRangesOffset = offset + 198779;
+            if (numRangesOffset + 4 > blockData.Length)
+            {
+                // Not enough bytes left
+                Data = [];
+                return 0;
+            }
+
+            var numRanges = BitConverter.ToInt32(blockData, numRangesOffset);
+
+            // Read model data
+            var currentPosInObject = numRangesOffset + 4;
+            for (var i = 0; i < numRanges; i++)
+            {
+                if (currentPosInObject + 4 > blockData.Length)
+                {
+                    // Not enough bytes left
+                    Data = [];
+                    return 0;
+                }
+
+                var dataChunkSize = BitConverter.ToInt32(blockData, currentPosInObject);
+                ChunkData.Add(blockData.Skip(currentPosInObject).Take(dataChunkSize).ToArray());
+                currentPosInObject += (4 + dataChunkSize);
+            }
+
+            var totalObjectSize = currentPosInObject - offset;
+            Data = blockData.Skip(offset).Take(totalObjectSize).ToArray();
+
             var currentOffset = 0;
 
+            // Main Header
+            var objectType = BitConverter.ToInt32(Data, currentOffset);
+            currentOffset += 4;
+            if (PrefabType != objectType)
             {
-                // Main Header
-                var objectType = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                BoundingBoxMin = new Vector3(BitConverter.ToSingle(Data, currentOffset), BitConverter.ToSingle(Data, currentOffset + 4), BitConverter.ToSingle(Data, currentOffset + 8)); currentOffset += 12;
-                BoundingBoxMax = new Vector3(BitConverter.ToSingle(Data, currentOffset), BitConverter.ToSingle(Data, currentOffset + 4), BitConverter.ToSingle(Data, currentOffset + 8)); currentOffset += 12;
-                UnknownPadding1 = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                CullDistance = BitConverter.ToSingle(Data, currentOffset); currentOffset += 4;
-                BitMask = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                ViewDistanceRatio = Data[currentOffset]; currentOffset += 1;
-                LodRatio = Data[currentOffset]; currentOffset += 1;
-                UnknownPadding2 = Data[currentOffset]; currentOffset += 1;
-
-                // Voxel Header
-                VoxelChunkType = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                VoxelExtraX = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                VoxelExtraY = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                VoxelExtraZ = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-                VoxelResolution = new int[3] { BitConverter.ToInt32(Data, currentOffset), BitConverter.ToInt32(Data, currentOffset + 4), BitConverter.ToInt32(Data, currentOffset + 8) }; currentOffset += 12;
-                VoxelUnknown = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-
-                // Voxel Data Channels
-                ProcessedChunk1 = Data.Skip(currentOffset).Take(65536).ToArray(); currentOffset += 65536;
-                MaterialNamesData = Data.Skip(currentOffset).Take(2048).ToArray(); currentOffset += 2048;
-                ProcessedChunk2 = Data.Skip(currentOffset).Take(131072).ToArray(); currentOffset += 131072;
-
-                ModelTransformMatrix = GetMatrix3X4(Data, currentOffset);
-                /*
-                ModelTransformMatrix = new float[12] {
-                BitConverter.ToSingle(Data, currentOffset),      BitConverter.ToSingle(Data, currentOffset + 4),  BitConverter.ToSingle(Data, currentOffset + 8),
-                BitConverter.ToSingle(Data, currentOffset + 12), BitConverter.ToSingle(Data, currentOffset + 16), BitConverter.ToSingle(Data, currentOffset + 20),
-                BitConverter.ToSingle(Data, currentOffset + 24), BitConverter.ToSingle(Data, currentOffset + 28), BitConverter.ToSingle(Data, currentOffset + 32),
-                BitConverter.ToSingle(Data, currentOffset + 36), BitConverter.ToSingle(Data, currentOffset + 40), BitConverter.ToSingle(Data, currentOffset + 44) };
-                */
-                currentOffset += 48;
-                ModelNumLods = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+                // failed
+                Data = [];
+                return 0;
             }
+
+            BoundingBoxMin = new Vector3(BitConverter.ToSingle(Data, currentOffset), BitConverter.ToSingle(Data, currentOffset + 4), BitConverter.ToSingle(Data, currentOffset + 8)); currentOffset += 12;
+            BoundingBoxMax = new Vector3(BitConverter.ToSingle(Data, currentOffset), BitConverter.ToSingle(Data, currentOffset + 4), BitConverter.ToSingle(Data, currentOffset + 8)); currentOffset += 12;
+            UnknownPadding1 = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            CullDistance = BitConverter.ToSingle(Data, currentOffset); currentOffset += 4;
+            BitMask = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            ViewDistanceRatio = blockData[currentOffset]; currentOffset += 1;
+            LodRatio = blockData[currentOffset]; currentOffset += 1;
+            UnknownPadding2 = blockData[currentOffset]; currentOffset += 1;
+
+            // Voxel Header
+            VoxelChunkType = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            VoxelExtraX = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            VoxelExtraY = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            VoxelExtraZ = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+            VoxelResolution =
+            [
+                BitConverter.ToInt32(Data, currentOffset),
+                BitConverter.ToInt32(Data, currentOffset + 4),
+                BitConverter.ToInt32(Data, currentOffset + 8)
+            ]; currentOffset += 12;
+            VoxelUnknown = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+
+            // Voxel Data Channels
+            ProcessedChunk1 = Data.Skip(currentOffset).Take(65536).ToArray(); currentOffset += 65536;
+            MaterialNamesData = Data.Skip(currentOffset).Take(2048).ToArray(); currentOffset += 2048;
+            ProcessedChunk2 = Data.Skip(currentOffset).Take(131072).ToArray(); currentOffset += 131072;
+
+            ModelTransformMatrix = GetMatrix3X4(Data, currentOffset); currentOffset += 48;
+            ModelNumLods = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
+
             LodCompressedSize = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
             LodUnCompressedSize = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
-            var dataSizetoRead = LodCompressedSize - 4;
-            if (dataSizetoRead < 0)
+            var dataSizeToRead = LodCompressedSize - 4;
+            if (dataSizeToRead < 0)
             {
                 // Compressed Voxel data size is smaller than expected.
-                return false;
+                Data = [];
+                return 0;
             }
-            if (Data.Length < currentOffset + dataSizetoRead)
+
+            if (Data.Length < currentOffset + dataSizeToRead)
             {
                 // Not enough data to read compressed voxel data.
-                return false;
+                Data = [];
+                return 0;
             }
-            var endOffset = currentOffset + dataSizetoRead;
-            CompressedModelData = Data.Skip(currentOffset).Take(dataSizetoRead).ToArray();
+            
+            CompressedModelData = Data.Skip(currentOffset).Take(dataSizeToRead).ToArray();
 
-
-
-            return true;
+            return Data.Length;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error compiling voxel data: {ex.Message}");
-            return false;
+            Data = [];
+            return 0;
         }
-
-        /*
-         * TYPE_6_STRUCTURE = [
-        # --- Main Header (43 bytes) ---
-        ('object_type',           4),   # int32: Should be 6
-        ('bounding_box',          24),  # 6 floats start bounding box and end boundbox pos
-        ('unknown_padding_1',     4),
-        ('cull_distance',         4),   # float
-        ('bitmask',               4),   # int32
-        ('view_distance_ratio',   1),   # int8
-        ('lod_ratio',             1),   # int8
-        ('unknown_padding_2',     1),
-
-        # --- Voxel Header (32 bytes) ---
-        ('voxel_chunk_type',      4),
-        ('voxel_extra_x',         4),   # int32: Will be used by voxel_string.py
-        ('voxel_extra_y',         4),   # int32: Will be used by voxel_string.py
-        ('voxel_extra_z',         4),   # int32: Will be used by voxel_string.py
-        ('voxel_resolution',      12),
-        ('voxel_unknown',         4),
-
-        # --- Voxel Data Channels (The old 'compression_bytes') ---
-        ('processed_chunk_1',     65536),
-        ('material_names',        2048),  # Will be used by voxel_string.py
-        ('processed_chunk_2',     131072),
-
-        # --- Model Header (52 bytes) ---
-        ('model_transform_matrix', 48),
-        ('model_num_lods',        4),    # int32
-        ]
-        */
     }
 
     public bool ExportData(string fileName)
@@ -175,7 +179,7 @@ public class ObjectDataType6Voxel() : ObjectDataBase(6)
             // Source vertices were loaded as -X, Z, Y format already
             objFileSb.AppendLine($"v {(vertex.X).ToString(CultureInfo.InvariantCulture)} {vertex.Y.ToString(CultureInfo.InvariantCulture)} {vertex.Z.ToString(CultureInfo.InvariantCulture)}");
         }
-        for (int i = 0; i < MeshReader.Indices.Count; i += 3)
+        for (var i = 0; i < MeshReader.Indices.Count; i += 3)
         {
             var f1 = MeshReader.Indices[i] + 1;
             var f2 = MeshReader.Indices[i + 1] + 1;
