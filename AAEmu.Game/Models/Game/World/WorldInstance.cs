@@ -12,6 +12,7 @@ using AAEmu.Game.Models.Game.Gimmicks;
 using AAEmu.Game.Models.Game.Indun;
 using AAEmu.Game.Models.Game.NPChar;
 using AAEmu.Game.Models.Game.Units;
+using AAEmu.Game.Utils;
 using Jitter2.LinearMath;
 using NLog;
 
@@ -251,6 +252,18 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     }
 
     /// <summary>
+    /// Checks if point x, y is within a JBoundingBox ignoring height
+    /// </summary>
+    /// <param name="box"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public static bool JBoundingBoxContains2DPoint(JBoundingBox box, float x, float y)
+    {
+        return (x >= box.Min.X && x <= box.Max.X && y >= box.Min.Z && y <= box.Max.Z);
+    }
+
+    /// <summary>
     /// Gets height at target position using various methods (recommended way to get solid surface height)
     /// </summary>
     /// <param name="pos"></param>
@@ -258,44 +271,88 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     public float GetHeight(Vector3 pos)
     {
         const float GeoCheckMaxDistance = 3f;
+        const float RayCastStartZOffset = 2f;
         // refPos to us as a starting point to find surface, we put this 2m higher that requested location
         // to take into account possible model clipping
-        var refPos = pos with { Z = pos.Z + 2f };
+        var refPos = pos with { Z = pos.Z + RayCastStartZOffset };
         var hMapRes = 0f;
+        var voxelRes = 0f;
+        var voxelDist = float.PositiveInfinity;
+        var traceDirection = -JVector.UnitY;
+        var hitResultList = new List<float>(4) { 0f }; // should be max 4 entries with the current detection system
         // First try using physics engine
         if (Physics is { WorldHeightMapTester: not null })
         {
+            // Check voxel floor collision
+            foreach ( var voxel in Physics.VoxelObjects)
+            {
+                foreach (var voxelShape in voxel.Shapes)
+                {
+                    // TODO: There seems to be some issue with the voxel dimensions and/or position
+                    // Logger.Info($"Voxel Pos {voxel.Position}, Box {voxelShape.WorldBoundingBox}");
+                    if (!JBoundingBoxContains2DPoint(voxelShape.WorldBoundingBox, refPos.X, refPos.Y))
+                        continue;
+
+                    var traceOrigin = refPos.ToJVector();
+                    if (voxelShape.RayCast(traceOrigin, traceDirection, out var normal, out var lambda))
+                    {
+                        var targetHeightJPos = traceOrigin + lambda * traceDirection;
+                        // Check if closer AND below reference height
+                        if (lambda < voxelDist && targetHeightJPos.Y <= refPos.Z)
+                        {
+                            voxelRes = targetHeightJPos.Y;
+                            voxelDist = lambda;
+                        }
+                        // TODO: Maybe add all possible hits to the list?
+                    }
+                }
+            }
+
+            // If it hit a voxel, we can assume this is the valid solution
+            if (voxelRes > 0)
+            {
+                hitResultList.Add(voxelRes);
+                // return voxelRes;
+            }
+
+            // Get from Heightmap tester only
             hMapRes = GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
+            if (hMapRes > 0)
+            {
+                hitResultList.Add(hMapRes);
+            }
         }
 
+        // NOTE: Temporary disabled navmesh node assisted height detection (might not be needed in the future)
+        /*
         // Check the netmission0.bai files node descriptors
         var netMissionNodeDescriptorsRes = Template.GeoData?.GetHeight(refPos, pos.Z, GeoCheckMaxDistance) ?? 0f;
-
-        // If no heightmap hit, and no geo data hit, then just return the heightmap
-        if ((hMapRes >= 0f) && (netMissionNodeDescriptorsRes <= 0f))
+        if (netMissionNodeDescriptorsRes > 0f)
         {
-            return hMapRes;
+            hitResultList.Add(netMissionNodeDescriptorsRes);
+        }
+        */
+
+        hitResultList.Add(float.PositiveInfinity);
+        hitResultList.Sort();
+
+        // Find the lowest possible result
+        var hitRes = hitResultList[0];
+        for (var i = 1; i < hitResultList.Count; i++)
+        {
+            if (hitResultList[i] >= refPos.Z && hitResultList[i - 1] < refPos.Z)
+            {
+                hitRes = hitResultList[i - 1];
+                break;
+            }
         }
 
-        // We are on a heightmap hole, try to use the geo data
-        if ((hMapRes <= 0f) && (netMissionNodeDescriptorsRes > 0f))
+        if (hitRes > 0f)
         {
-            return netMissionNodeDescriptorsRes;
-        }
-
-        // If both return a result, then determine the one that's best fit
-        if ((hMapRes > 0f) && (netMissionNodeDescriptorsRes > 0f))
-        {
-            var deltaH = Math.Abs(pos.Z - hMapRes);
-            var deltaG = Math.Abs(pos.Z - netMissionNodeDescriptorsRes);
-            // Apply preference modifiers by height checks, slight bias towards downwards
-            deltaH = pos.Z >= hMapRes ? deltaH * 0.9f : deltaH * 1.1f; 
-            deltaG = pos.Z >= netMissionNodeDescriptorsRes ? deltaG * 0.9f : deltaG * 1.1f;
-            return deltaG < deltaH ? netMissionNodeDescriptorsRes : hMapRes;
+            return hitRes;
         }
         
-        
-        // Fallback to the old heightmap.dat data method
+        // Fallback to the old heightmap.dat data method (this mostly happens when world terrain hasn't been loaded yet) 
         hMapRes = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
         return hMapRes;
     }
@@ -807,6 +864,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     /// Gets a solid floor location using ray-casting on the heightmaptester
     /// </summary>
     /// <param name="targetPosition"></param>
+    /// <param name="defaultHeight">Height returned if no valid point has been found</param>
     /// <returns></returns>
     public float GetHeightByRayCastOnHeightMapOnly(Vector3 targetPosition, float defaultHeight)
     {

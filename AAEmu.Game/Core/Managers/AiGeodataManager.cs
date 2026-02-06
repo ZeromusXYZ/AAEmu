@@ -278,12 +278,13 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         //stopWatch.Start();
         var rawFloorPos = pos with { Z = worldTemplate.GetHeight(pos.X, pos.Y) };
         var rawFloorDelta = pos.Z - rawFloorPos.Z;
+
+        // Try to get height from .bai files data
         try
         {
             var closestPoint = Vector3.Zero;
             var closestDistance = float.MaxValue;
 
-            // Try to get height from .bai files data
             var bai = worldTemplate.GetBaiByPos(pos);
             if (bai != null)
             {

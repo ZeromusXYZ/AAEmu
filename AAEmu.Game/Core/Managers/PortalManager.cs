@@ -440,7 +440,7 @@ public class PortalManager(ILocalizationManager localizationManager, IWorldManag
     public Portal GetClosestReturnPortal(Character character)
     {
         var currentPosition = character.Transform.World.Position;
-        var distance = 999999f;
+        var distance = float.PositiveInfinity;
         var portal = new Portal {
             // Fail-safe coordinates
             X = currentPosition.X,

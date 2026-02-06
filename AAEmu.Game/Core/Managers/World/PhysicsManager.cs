@@ -14,6 +14,7 @@ using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Units;
 using AAEmu.Game.Models.Game.Units.Movements;
 using AAEmu.Game.Models.Game.World;
+using AAEmu.Game.Models.Observers;
 using AAEmu.Game.Physics;
 using AAEmu.Game.Physics.Forces;
 using AAEmu.Game.Physics.HeightMaps;
@@ -66,6 +67,7 @@ public class PhysicsManager
     // ReSharper disable once ChangeFieldTypeToSystemThreadingLock
     private readonly object _worldLock = new();
     private readonly List<RigidBody> _bodies = [];
+    public List<RigidBody> VoxelObjects { get; init; }= [];
 
     /// <summary>
     /// Used heightmap tester, saved so it can be edited later
@@ -759,8 +761,55 @@ public class PhysicsManager
 
     private void AddVoxelTerrain(WorldCell cell, ObjectDataType6Voxel voxel)
     {
-        var cellOffset = cell.GetCellWorldOffset();
-        // TODO: Generate terrain mesh
+        var cellOffset = cell.GetCellWorldOffset().ToJVector();
+
+        if (voxel.MeshReader == null)
+            return;
+
+        lock (_worldLock)
+        {
+            var voxelObject = PhysWorld.CreateRigidBody();
+            voxelObject.Tag = voxel;
+            voxelObject.AffectedByGravity = false;
+            voxelObject.Position = new JVector(voxel.ModelTransformMatrix.M14, voxel.ModelTransformMatrix.M34, voxel.ModelTransformMatrix.M24);
+
+            var triangleList = new List<JTriangle>();
+            for (var i = 0; i < voxel.MeshReader.Indices.Count - 2; i += 3)
+            {
+                var i1 = voxel.MeshReader.Indices[i];
+                var i2 = voxel.MeshReader.Indices[i + 1];
+                var i3 = voxel.MeshReader.Indices[i + 2];
+                var v1 = new JVector(voxel.MeshReader.Vertices[i1].X, voxel.MeshReader.Vertices[i1].Z, voxel.MeshReader.Vertices[i1].Y);
+                var v2 = new JVector(voxel.MeshReader.Vertices[i2].X, voxel.MeshReader.Vertices[i2].Z, voxel.MeshReader.Vertices[i2].Y);
+                var v3 = new JVector(voxel.MeshReader.Vertices[i3].X, voxel.MeshReader.Vertices[i3].Z, voxel.MeshReader.Vertices[i3].Y);
+
+                triangleList.Add(new JTriangle(v1, v2, v3));
+            }
+
+            // Load triangles into a mesh
+            var voxelMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
+            // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
+            for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
+            {
+                var voxelShape = new TriangleShape(voxelMesh, i);
+                // Apply transform before adding
+                var m3X3 = new JMatrix(
+                    voxel.ModelTransformMatrix.M11, voxel.ModelTransformMatrix.M31, voxel.ModelTransformMatrix.M21,
+                    voxel.ModelTransformMatrix.M13, voxel.ModelTransformMatrix.M33, voxel.ModelTransformMatrix.M23,
+                    voxel.ModelTransformMatrix.M12, voxel.ModelTransformMatrix.M32, voxel.ModelTransformMatrix.M22);
+                var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+                voxelObject.AddShape(transformedShape, false); // Has no mass
+            }
+
+            // Apply Cell offset after transform
+            voxelObject.Position += cellOffset;
+
+            // Mark the floor as static
+            voxelObject.IsStatic = true;
+
+            // Add to reference list
+            VoxelObjects.Add(voxelObject); // Need to save them here for faster heightmap floor collision testing
+        }
     }
 
     public void AddVoxelTerrain(WorldCell worldCell)
