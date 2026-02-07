@@ -1,20 +1,16 @@
 #define EXPORT_TERRAIN_ON_LOAD
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
-using System.Text;
-using System.Threading;
 
-using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.Models;
-using AAEmu.Game.Models.ClientData;
 using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Units;
 using AAEmu.Game.Models.Game.Units.Movements;
 using AAEmu.Game.Models.Game.World;
-using AAEmu.Game.Models.Observers;
 using AAEmu.Game.Physics;
 using AAEmu.Game.Physics.Forces;
 using AAEmu.Game.Physics.HeightMaps;
@@ -846,5 +842,31 @@ public class PhysicsManager
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Updates NodeDescriptorList nodes to make them perfectly align with the surface. This should improve movement for AI
+    /// </summary>
+    public void ReAlignLoadedBaiNodePoints(WorldCell worldCell)
+    {
+        return; // temporary disable
+        var timer = new Stopwatch();
+        timer.Start();
+        //lock (_worldLock)
+        {
+            foreach (var baseBaiLoader in worldCell.BaiLoader)
+            {
+                foreach (var netMissionReader in baseBaiLoader.NetMissionReaders)
+                {
+                    foreach (var (key, node) in netMissionReader.NodeDescriptorList)
+                    {
+                        var newPos = node.Pos with { Z = SimulationWorld.GetHeight(node.Pos) };
+                        node.Pos = newPos;
+                    }
+                }
+            }
+        }
+        timer.Stop();
+        Logger.Debug($"ReAlignLoadedBaiNodePoints for {worldCell.Template.Name} Cell {worldCell.CellX:000}_{worldCell.CellY:000} took {timer.ElapsedMilliseconds} ms");
     }
 }

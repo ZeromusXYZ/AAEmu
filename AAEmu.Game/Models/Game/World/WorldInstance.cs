@@ -284,7 +284,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         if (Physics is { WorldHeightMapTester: not null })
         {
             // Check voxel floor collision
-            foreach ( var voxel in Physics.VoxelObjects)
+            foreach ( var voxel in Physics.VoxelObjects.ToArray())
             {
                 foreach (var voxelShape in voxel.Shapes)
                 {
@@ -359,20 +359,20 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
 
     public float GetReferenceHeight(NpcAi ai, Vector3 pos, uint zoneId)
     {
-        float finalHeight;
+        var solidFloorHeight = GetHeight(pos);
 
         // 0. Just in case.
         if (ai == null)
         {
-            finalHeight = GetHeight(pos);
-            return finalHeight;
+            return solidFloorHeight;
         }
 
+        var spawnerHeight = ai.Owner.Spawner.Position.Z;
+
         // 1. If an NPC can fly, the height is taken from the spawner's position.
-        if (ai.Owner.CanFly)
+        if (ai.Owner.CanFly && ai.Owner.CurrentAggroTarget == null)
         {
-            finalHeight = ai.Owner.Spawner.Position.Z;
-            return finalHeight;
+            return Math.Max(solidFloorHeight, spawnerHeight);
         }
 
         // 2. For HoldPositionBehavior and IdleBehavior, the height is taken from the spawner.
@@ -380,19 +380,17 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         {
             case HoldPositionBehavior:
             case IdleBehavior:
-                finalHeight = ai.Owner.Spawner.Position.Z;
-                return finalHeight;
+                return Math.Max(solidFloorHeight, spawnerHeight);;
         }
 
         // 3. Terrain height retrieval
-        finalHeight = GetHeight(pos);
-        if (finalHeight != 0/* && Math.Abs(worldHeight - Spawner.Position.Z) <= 0.1f*/)
+        if (solidFloorHeight >= 0f /* && Math.Abs(worldHeight - Spawner.Position.Z) <= 0.1f*/)
         {
-            return finalHeight;
+            return solidFloorHeight;
         }
 
         // 4. Take the default height
-        return ai.Owner.Spawner?.Position.Z ?? ai.Owner.Transform.World.Position.Z;
+        return ai.Owner.Transform.World.Position.Z; // ai.Owner.Spawner?.Position.Z ?? ai.Owner.Transform.World.Position.Z;
     }
 
     /// <summary>

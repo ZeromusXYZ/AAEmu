@@ -1,9 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using System.Numerics;
-
 using AAEmu.Game.Core.Managers;
-using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.Models.CryEngine.Mission;
 using AAEmu.Game.Models.Game.AI.v2.Behaviors.Common;
 using AAEmu.Game.Models.Game.AI.v2.Framework;
 using AAEmu.Game.Models.Game.Char;
@@ -1247,11 +1246,12 @@ public partial class Npc : Unit
     /// <param name="other">Target position</param>
     /// <param name="distance">Maximum distance to move (before multipliers)</param>
     /// <param name="actorFlags">ActorFlags to use for the movement packet</param>
-    /// <param name="rangeTolerance">Makes the function return true if target distance is less than or equil to this value</param>
+    /// <param name="rangeTolerance">Makes the function return true if target distance is less than or equal to this value</param>
     /// <returns>True if withing rangeTolerance of other</returns>
     public bool MoveTowards(Vector3 other, float distance, byte actorFlags = 4, float rangeTolerance = 1f)
     {
-        distance *= Ai.Owner.MoveSpeedMul; // Apply speed modifier
+        var movingIntoAttackRange = Ai?.Owner?.CurrentAggroTarget is not null;
+        distance *= Ai?.Owner?.MoveSpeedMul ?? 1f; // Apply speed modifier
         if (distance < 0.01f)
             return false;
 
@@ -1289,7 +1289,8 @@ public partial class Npc : Unit
         // TODO: Implement proper use for Transform.World.AddDistanceToFront
         var (newX, newY, newZ) = World.Transform.PositionAndRotation.AddDistanceToFront(travelDist, targetDist, Transform.Local.Position, other);
         var targetPositionZ = ParentWorld.GetReferenceHeight(Ai, new Vector3(newX, newY, newZ), Transform.ZoneId);
-        Transform.Local.SetPosition(newX, newY, targetPositionZ);
+        // Move to new Z position (different if NPC is flying and trying to attack)
+        Transform.Local.SetPosition(newX, newY, (movingIntoAttackRange && (Ai?.Owner?.CanFly ?? false)) ? newZ : targetPositionZ);
 
         var angle = MathUtil.CalculateAngleFrom(Transform.Local.Position, other);
         var (velX, velY) = MathUtil.AddDistanceToFront(4000, 0, 0, (float)angle.DegToRad());
@@ -1401,18 +1402,18 @@ public partial class Npc : Unit
         Ai.AlreadyTargeted = other != null;
     }
 
-    public void FindPath(Unit abuser)
+    public List<Vector3> FindPath1(Unit abuser)
     {
         Ai.PathNode.StartPointPos = new Vector3(Ai.Owner.Transform.World.Position.X, Ai.Owner.Transform.World.Position.Y, Ai.Owner.Transform.World.Position.Z);
         Ai.PathNode.EndPointPos = new Vector3(abuser.Transform.World.Position.X, abuser.Transform.World.Position.Y, abuser.Transform.World.Position.Z);
 
         Ai.PathNode.ZoneKey = Ai.Owner.Transform.ZoneId;
-        var resList = Ai.PathNode.FindPath(Ai.Owner.ParentWorld, Ai.PathNode.StartPointPos, Ai.PathNode.EndPointPos, out var hasDifferentTypes);
+        var resList = Ai.PathNode.FindPath(Ai.Owner.ParentWorld, Ai.PathNode.StartPointPos, Ai.PathNode.EndPointPos, out _);
         resList.Add(abuser.Transform.World.Position);
-        var reducedPath = hasDifferentTypes ? new Queue<Vector3>(resList) : ParentWorld.Template.GeoData.ReducePath(resList, 5);
+        var reducedPath = ParentWorld.Template.GeoData.ReducePath(resList, 5);
         Ai.PathNode.FoundPath = reducedPath;
-        /*
-        // Send path debug information to the player that has been targetted
+        
+        // Send path debug information to the player that has been targeted
         if (abuser is Character player)
         {
             player.SendMessage($"Aggro from {Ai.Owner.ObjId}, getting attack path in {Ai.PathNode.FoundPath.Count}/{resList.Count} steps");
@@ -1421,8 +1422,179 @@ public partial class Npc : Unit
                 player.SendMessage($"Path step -> {v3}");
             }
         }
-        */
+
+        return reducedPath.ToList();
     }
+
+    /// <summary>
+    /// Creates a list of points that goes around a shape with th shorttest travel distance to a given target 
+    /// </summary>
+    /// <param name="target"></param>
+    /// <param name="aiShape"></param>
+    /// <param name="interSectionPoint"></param>
+    /// <param name="intersectionIndex"></param>
+    /// <returns></returns>
+    private List<Vector3> WalkShapeToClosestTargetPoint(Vector3 target, AiShape aiShape, Vector3 interSectionPoint, int intersectionIndex)
+    {
+        if (intersectionIndex < 0 || intersectionIndex >= aiShape.Points.Count)
+        {
+            Logger.Warn($"Error in finding closest point in aiShape {aiShape.Name} to target {target}, invalid SOURCE index {intersectionIndex}");
+            return [target];
+        }
+
+        // Find the point in the shape that's shortest to target
+        var shortestIndex = intersectionIndex;
+        var shortestDistance = Vector3.Distance(aiShape.Points[shortestIndex], target);
+        for(var i = 0; i < aiShape.Points.Count; i++)
+        {
+            // Skip what we are already starting at
+            if (i == shortestIndex)
+            {
+                continue;
+            }
+
+            var shapePoint = aiShape.Points[i];
+
+            var distanceToTarget = Vector3.Distance(shapePoint, target);
+            if (distanceToTarget < shortestDistance)
+            {
+                shortestIndex = i;
+                shortestDistance = distanceToTarget;
+            }
+        }
+
+        if (shortestIndex < 0 || shortestIndex >= aiShape.Points.Count)
+        {
+            Logger.Warn($"Error in finding closest point in aiShape {aiShape.Name} to target {target}, invalid TARGET index {shortestIndex}");
+            return [target];
+        }
+
+        // TODO: Optimize the initial length check from intersection towards shape point
+
+        // Check by counting up
+        var up = new List<Vector3>();
+        var upLength = 0f;
+        var lastPoint = aiShape.Points[intersectionIndex];
+        up.Add(interSectionPoint);
+        up.Add(lastPoint);
+        for (var i = intersectionIndex;; i++)
+        {
+            // loop shape
+            if (i >= aiShape.Points.Count)
+            {
+                i = 0;
+            }
+
+            var shapePoint = aiShape.Points[i];
+            upLength += Vector3.Distance(shapePoint, lastPoint);
+            up.Add(shapePoint);
+            if (i == shortestIndex)
+            {
+                break;
+            }
+        }
+
+        // Check by counting down
+        var down = new List<Vector3>();
+        var downLength = 0f;
+        lastPoint = aiShape.Points[intersectionIndex];
+        down.Add(interSectionPoint);
+        down.Add(lastPoint);
+        for (var i = intersectionIndex; ; i--)
+        {
+            // loop shape
+            if (i < 0)
+            {
+                i = aiShape.Points.Count - 1;
+            }
+            var shapePoint = aiShape.Points[i];
+            downLength += Vector3.Distance(shapePoint, lastPoint);
+            down.Add(shapePoint);
+            if (i == shortestIndex)
+            {
+                break;
+            }
+        }
+
+        if (upLength <= downLength)
+        {
+            return up;
+        }
+
+        return down;
+    }
+
+    /// <summary>
+    /// Alternative find path method that doesn't use navmesh node data directly (only forbidden zones)
+    /// </summary>
+    /// <param name="abuser"></param>
+    public List<Vector3> FindPath2(Unit abuser)
+    {
+        const int maxDeviations = 10;
+        // TODO: Adjustments for flying/swimming mobs
+        // Get "floor level" of current location
+        var startFloorPoint = Transform.World.Position with { Z = ParentWorld.GetHeight(Transform.World.Position) };
+        var endFloorPoint = abuser.Transform.World.Position with { Z = ParentWorld.GetHeight(abuser.Transform.World.Position) };
+        var distanceToTargetPoint = Vector3.Distance(startFloorPoint, endFloorPoint);
+        var pathPoints = new List<Vector3>();
+        //pathPoints.Add(Transform.World.Position);
+        //pathPoints.Add(startFloorPoint);
+        var deviationCount = 0;
+        var currentPoint = startFloorPoint;
+        // TODO: Add moving obstacles to this list
+        var ignoredShapes = new List<string>();
+        var hasObstacles = ParentWorld.Template.GeoData.LinePassesThroughForbiddenArea(currentPoint, endFloorPoint, ignoredShapes, false, out var forbiddenObstacleShape, out var intersectionPoint, out var intersectionIndex, 0f);
+        while (hasObstacles && deviationCount < maxDeviations)
+        {
+            deviationCount++;
+            if (!ignoredShapes.Contains(forbiddenObstacleShape.Name))
+            {
+                ignoredShapes.Add(forbiddenObstacleShape.Name);
+            }
+            var lastObstacleName = forbiddenObstacleShape.Name;
+            // Something is blocking our way
+            // var distanceToObstacle = Vector3.Distance(currentPoint, intersectionPoint);
+            
+            // TODO: Walk the shape outline in both direction until the shortest point to the end is found and keep the one that ends up the closest
+            var aroundTheShape = WalkShapeToClosestTargetPoint(endFloorPoint, forbiddenObstacleShape, intersectionPoint, intersectionIndex);
+
+            // Copy output
+            foreach (var v3 in aroundTheShape)
+            {
+                var floor = v3 with { Z = ParentWorld.GetHeight(v3) };
+                pathPoints.Add(floor);
+            }
+
+            currentPoint = pathPoints[^1];
+
+            // TODO: check for new obstacles and repeat until at target (or out of allowed steps)
+            hasObstacles = ParentWorld.Template.GeoData.LinePassesThroughForbiddenArea(currentPoint, endFloorPoint, ignoredShapes, false, out forbiddenObstacleShape, out intersectionPoint, out intersectionIndex, 0f);
+
+            // If we somehow still end up on the same shape, break the loop (WalkShapeToClosestTargetPoint should have prevented this)
+            if (hasObstacles && lastObstacleName == forbiddenObstacleShape.Name)
+            {
+                Logger.Warn($"FindPath2:Repeated a obstacle hit with one that was previously hit {lastObstacleName}");
+                break;
+            }
+        }
+        pathPoints.Add(endFloorPoint);
+
+        // TODO: Do a path reduction on the final result
+        // TODO: Make AI keep a safety range from the forbidden point edges
+        var reduced = ParentWorld.Template.GeoData.ReducePath(pathPoints, 10);
+
+        Ai.PathNode.CurrentTargetPos = Transform.World.Position;
+        Ai.PathNode.StartPointPos = startFloorPoint;
+        Ai.PathNode.EndPointPos = endFloorPoint;
+        Ai.PathNode.ZoneKey = Transform.ZoneId;
+        Ai.PathNode.FoundPath.Clear();
+        foreach (var v3 in reduced)
+            Ai.PathNode.FoundPath.Enqueue(v3);
+        // Logger.Debug($"FoundPath set to {Ai.PathNode.FoundPath.Count} points");
+        return pathPoints;
+    }
+    
+    public List<Vector3> FindPath(Unit abuser) => FindPath2(abuser);
 
     /// <summary>
     /// Runs parent spawner's DoDeSpawn

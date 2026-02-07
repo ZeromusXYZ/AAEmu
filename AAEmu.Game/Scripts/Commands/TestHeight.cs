@@ -39,7 +39,7 @@ public class TestHeight : ICommand
 
     public string GetCommandLineHelp()
     {
-        return "(target) [testpos||mark||line||clear] [geo||ray]";
+        return "(target) [testpos||mark||line||clear||nav] [geo||ray]";
     }
 
     public string GetCommandHelpText()
@@ -112,6 +112,42 @@ public class TestHeight : ICommand
             targetPlayer.DisabledSetPosition = true;
             targetPlayer.SendPacket(new SCTeleportUnitPacket(0, 0, TargetX, TargetY, TargetZ, 0f));
             targetPlayer.SendMessage($"[Move] |cFFFFFFFF{targetPlayer.Name}|r moved to X: {TargetX}, Y: {TargetY}, Z: {TargetZ}");
+        }
+        else if (args.Length > firstarg && args[firstarg].ToLower() == "nav")
+        {
+            var bai = targetPlayer.ParentWorld.Template.GetBaiByPos(targetPlayer.Transform.World.Position);
+
+            var c = 0;
+            foreach (var baiNetMissionReader in bai.NetMissionReaders)
+            {
+                foreach (var (id, node) in baiNetMissionReader.NodeDescriptorList)
+                {
+                    if ((targetPlayer.Transform.World.Position - node.Pos).Length2D() > 50f)
+                        continue;
+                    
+                    var unitId = node.Type == 99 ? 4763u : 5622u; // Crescent Throne Flag : Pillar
+                    if (!DoodadManager.Instance.Exist(unitId))
+                    {
+                        return;
+                    }
+
+                    var doodadSpawner = new DoodadSpawner();
+                    doodadSpawner.ParentWorld = character.ParentWorld;
+                    doodadSpawner.Id = 0;
+                    doodadSpawner.UnitId = unitId;
+                    doodadSpawner.Position = character.Transform.CloneAsSpawnPosition();
+                    doodadSpawner.Position.X = node.Pos.X;
+                    doodadSpawner.Position.Y = node.Pos.Y;
+                    doodadSpawner.Position.Z = node.Pos.Z;
+                    doodadSpawner.Position.Yaw = 0;
+                    doodadSpawner.Position.Pitch = 0;
+                    doodadSpawner.Position.Roll = 0;
+                    PlacedMarkers.Add(doodadSpawner.Spawn(0));
+                    c++;
+                }
+            }
+            var pPos = targetPlayer.Transform.World.Position.ToPathsIndex();
+            CommandManager.SendNormalText(this, messageOutput, $"Added |cFFFFFFFF{c}|r nearby navmesh nodes for path {pPos.Item1:000}_{pPos.Item2:000}.");
         }
         else if (args.Length > firstarg && args[firstarg].ToLower() == "mark")
         {

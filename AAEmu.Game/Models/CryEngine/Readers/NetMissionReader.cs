@@ -1,6 +1,8 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using AAEmu.Commons.Exceptions;
 using AAEmu.Game.Models.CryEngine.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace AAEmu.Game.Models.CryEngine.Readers;
 
@@ -40,7 +42,10 @@ public class NetMissionReader : BaiReader
         {
             var nodeDescriptor = new NodeDescriptor(this)
             {
-                Id = Reader.ReadInt32(), Dir = ReadVector3(true), Up = ReadVector3(true), Pos = ReadVector3(),
+                Id = Reader.ReadInt32(),
+                Dir = ReadVector3(true),
+                Up = ReadVector3(true),
+                Pos = ReadVector3(),
                 Index = Reader.ReadInt32(),
                 Obstacle = new int[3]
             };

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Numerics;
+﻿using System.Numerics;
 
 using AAEmu.Commons.Utils;
 using AAEmu.Game.Core.Managers;
@@ -21,12 +20,13 @@ public abstract class BaseCombatBehavior : Behavior
 {
     protected bool _strafeDuringDelay;
     protected string _pipeName;
-    protected uint _phaseType;
+    private uint _phaseType;
     protected DateTime _combatStartTime;
     protected Queue<AiSkill> _skillQueue;
     private bool _startingSkillAlreadyUsed;
+    private Vector3 _lastAggroTargetPosition = Vector3.Zero;
 
-    public void MoveInRange(BaseUnit target, TimeSpan delta)
+    protected void MoveInRange(BaseUnit target, TimeSpan delta)
     {
         if (Ai?.Owner == null)
             return;
@@ -125,7 +125,7 @@ public abstract class BaseCombatBehavior : Behavior
                 range *= _maxWeaponRange;
         }
 
-        if (Ai.Owner.Template.BaseSkillId == 2 && Ai.Owner.Template.Skills.Count == 0 && range == 4)
+        if (Ai.Owner.Template.BaseSkillId == 2 && Ai.Owner.Template.Skills.Count == 0 && Math.Abs(range - 4) < 0.001f)
         {
             range -= 1f; // Fix that ID=7927, Plateau Earth Elemental can hit with a melee attack
         }
@@ -137,12 +137,14 @@ public abstract class BaseCombatBehavior : Behavior
             if (Ai.PathNode?.EndPointPos != null && Ai.PathNode != null)
             {
                 // If not at target position (take model size error margin), then calculate new target route position
-                if (Math.Abs((Ai.PathNode.EndPointPos - target.Transform.World.Position).Length()) <= Ai.Owner.ModelSize)
+                var dist = Vector3.Distance(Ai.PathNode.CurrentTargetPos, Ai.Owner.Transform.World.Position);
+                if (dist <= Ai.Owner.ModelSize)
                 {
-                    var stopWatch = new Stopwatch();
-                    stopWatch.Start();
+                    //var stopWatch = new Stopwatch();
+                    //stopWatch.Start();
                     Ai.Owner.FindPath((Unit)target);
-                    stopWatch.Stop();
+                    Ai.PathNode.CurrentTargetPos = Ai.PathNode.FoundPath.Dequeue();
+                    //stopWatch.Stop();
                     // Toss warning if it took a long time
                     //if (stopWatch.Elapsed.Ticks >= TimeSpan.TicksPerMillisecond)
                     //    Logger.Warn($"FindPath took {stopWatch.Elapsed} for Ai.Owner.ObjId:{Ai.Owner.ObjId}, Owner.TemplateId {Ai.Owner.TemplateId} @ {Ai.Owner.Transform}");
@@ -156,11 +158,10 @@ public abstract class BaseCombatBehavior : Behavior
             {
                 if (Ai.PathNode.FoundPath.Count > 0 && !Ai.PathNode.FoundPath.Peek().Equals(Vector3.Zero))
                 {
-                    var nextPathPoint = Ai.PathNode.FoundPath.Peek();
-                    distanceToTarget = MathUtil.CalculateDistance(Ai.Owner.Transform.World.Position, nextPathPoint, true);
+                    distanceToTarget = Vector3.Distance(Ai.PathNode.CurrentTargetPos, Ai.Owner.Transform.World.Position);
                     if (distanceToTarget > range)
                     {
-                        Ai.Owner.MoveTowards(nextPathPoint, (float)speed, moveFlags, range);
+                        Ai.Owner.MoveTowards(Ai.PathNode.CurrentTargetPos, (float)speed, moveFlags, range);
                     }
                     else
                     {
@@ -168,9 +169,11 @@ public abstract class BaseCombatBehavior : Behavior
                         {
                             Ai.Owner.StopMovement();
                             Ai.PathNode.FoundPath = [];
+                            Ai.PathNode.CurrentTargetPos = Ai.Owner.Transform.World.Position; // set to self
                             return;
                         }
 
+                        // Logger.Debug($"PathDequeue");
                         Ai.PathNode.CurrentTargetPos = Ai.PathNode.FoundPath.Dequeue();
                     }
                 }
@@ -263,7 +266,7 @@ public abstract class BaseCombatBehavior : Behavior
     /// Updates Aggro target to the one with the most aggro
     /// </summary>
     /// <returns></returns>
-    public bool UpdateTarget()
+    protected bool UpdateTarget()
     {
         // Check if owner still exists
         if (Ai?.Owner == null)
@@ -282,14 +285,25 @@ public abstract class BaseCombatBehavior : Behavior
             {
                 if (Ai.Owner.UnitIsVisible(abuser) && !abuser.IsDead)
                 {
-                    if (Ai.Owner.CurrentAggroTarget != abuser && !Ai.AlreadyTargeted)
+                    // trace a new path to abuser if abuser has moved a decent amount or if it's a new aggro target
+                    var isNewTarget = (Ai.Owner.CurrentAggroTarget != abuser && !Ai.AlreadyTargeted);
+                    var traceNewPath = isNewTarget ||
+                        Vector3.Distance(_lastAggroTargetPosition, abuser.Transform.World.Position) > Ai.Owner.ModelSize;
+                    if (traceNewPath)
                     {
-                        // TODO: find the path to abuser
                         Ai.Owner.FindPath(abuser);
+                        _lastAggroTargetPosition = abuser.Transform.World.Position;
                     }
                     Ai.Owner.CurrentAggroTarget = abuser;
                     Ai.Owner.SetTarget(abuser);
                     UpdateAggroHelp(abuser);
+                    /*
+                    if (traceNewPath && abuser is Character player)
+                    {
+                        player.SendMessage($"AI: Aggro targeting you with new {Ai.PathNode.FoundPath.Count} path nodes");
+                    }
+                    */
+
                     return true;
                 }
             }
@@ -506,7 +520,7 @@ public abstract class BaseCombatBehavior : Behavior
     /// <summary>
     /// Returns nearby players within range, in front, and not greeted recently.
     /// </summary>
-    public static List<Character> GetPlayersInRange(
+    protected static List<Character> GetPlayersInRange(
         Unit owner,
         float range,
         double fovScale,

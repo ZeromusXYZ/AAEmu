@@ -139,11 +139,13 @@ public class SCUnitStatePacket : GamePacket
             stream.Write("");
         }
 
+        /*
         if (npc is not null)
         {
             var referenceHeight = npc.ParentWorld.GetReferenceHeight(npc.Ai, _unit.Transform.Local.Position, _unit.Transform.ZoneId);
             _unit.Transform.Local.SetHeight(referenceHeight);
         }
+        */
 
         stream.WritePosition(_unit.Transform.Local.Position);
         stream.Write(_unit.Scale);

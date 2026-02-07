@@ -18,7 +18,7 @@ public abstract class BaiReader // : IDisposable
     /// </summary>
     public Vector3 ReaderPointOffset { get; set; } = Vector3.Zero;
 
-    public static bool IgnoreDuplicateAreaNames { get; set; } = true;
+    public static bool IgnoreDuplicateAreaNames { get; set; } = false;
 
     public virtual void InitReaderUtil()
     {

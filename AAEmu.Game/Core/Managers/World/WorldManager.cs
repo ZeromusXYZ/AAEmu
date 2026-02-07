@@ -117,6 +117,11 @@ public class WorldManager(
     public const int CELL_SIZE = 1024;
 
     /// <summary>
+    /// The size in meters of the area covered by one .bai file in the Paths folders
+    /// </summary>
+    public const int PATHS_SIZE = CELL_SIZE / 4;
+
+    /// <summary>
     /// Sector size in meters
     /// </summary>
     public const int REGION_SIZE = 64;

@@ -219,7 +219,7 @@ public class Skill
         if (Template.WeaponSlotForRangeId > 0)
         {
             var minWeaponRange = 0.0f; // Fist default
-            var maxWeaponRange = 3.0f; // Fist default
+            var maxWeaponRange = 4.0f; // Fist default
             if (unit.Equipment.GetItemBySlot(Template.WeaponSlotForRangeId)?.Template is WeaponTemplate weaponTemplate)
             {
                 minWeaponRange = weaponTemplate.HoldableTemplate.MinRange;

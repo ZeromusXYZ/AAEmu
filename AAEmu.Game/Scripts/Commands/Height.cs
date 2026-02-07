@@ -44,7 +44,14 @@ public class Height : ICommand
         CommandManager.SendNormalText(this, messageOutput, $"DetectedHeight: {defaultCheckHeight} ({character.Transform.World.Position.Z - defaultCheckHeight:F1})");
         CommandManager.SendNormalText(this, messageOutput, $"HMap Floor: {floorHeight} ({character.Transform.World.Position.Z - floorHeight:F1})");
         CommandManager.SendNormalText(this, messageOutput, $"RayCastHeight: {rayCastHeight} ({character.Transform.World.Position.Z - rayCastHeight:F1})");
-        
+
+        var bai = targetPlayer.ParentWorld.Template.GetBaiByPos(targetPlayer.Transform.World.Position);
+        if (bai != null)
+        {
+            var closestNode = bai.FindClosestNetMissionNode(targetPlayer.Transform.World.Position, 0);
+            CommandManager.SendNormalText(this, messageOutput, $"NetMission: ClosestNode {closestNode.Pos} dist={(character.Transform.World.Position - closestNode.Pos).Length():F1} diff={(character.Transform.World.Position.Z - closestNode.Pos.Z):F1}");
+        }
+
         // Dump Voxel Data
         /*
         var sb = new StringBuilder();
@@ -65,7 +72,7 @@ public class Height : ICommand
             {
                 var hasHitBox = WorldInstance.JBoundingBoxContains2DPoint(shape.WorldBoundingBox, targetPlayer.Transform.World.Position.X, targetPlayer.Transform.World.Position.Y);
                 var s = hasHitBox ? " HIT!" : string.Empty;
-                var dist = MathF.Abs((targetPlayer.Transform.World.Position.ToJVector() - shape.WorldBoundingBox.Min).Length()); 
+                var dist = MathF.Abs((targetPlayer.Transform.World.Position.ToJVector() - shape.WorldBoundingBox.Min).Length());
                 sb.AppendLine($"{i:0000} Shape: Dist: {dist:F1} Box: {shape.WorldBoundingBox}{s}");
             }
             sb.AppendLine();

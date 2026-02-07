@@ -157,9 +157,12 @@ public class AreasMissionReader(System.IO.Stream rawStream, uint zoneId) : BaiRe
             return;
 
         aiShape.Name = ReadName();
-
         aiShape.Points.Clear();
-        ;
+        if (aiShape.Name == "ForbiddenArea_258_oskelca_8")
+        {
+            // test
+        }
+
         var pointsSize = Reader.ReadUInt32();
         for (var i = 0; i < pointsSize; i++)
         {

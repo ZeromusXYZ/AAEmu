@@ -1,11 +1,13 @@
 // # define EXPORT_CELL_ON_LOAD
-
+using System.Diagnostics;
 using System.Numerics;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
 using AAEmu.Game.Models.ClientData;
+using AAEmu.Game.Models.CryEngine.Entities;
 using AAEmu.Game.Models.CryEngine.Loaders;
 using AAEmu.Game.Models.CryEngine.Objects;
+using AAEmu.Game.Utils;
 using Jitter2.LinearMath;
 using NLog;
 
@@ -50,7 +52,7 @@ public class WorldCell
             new JVector(CellOffset.X, 0f, CellOffset.Y), 
             new JVector(CellOffset.X + WorldManager.CELL_SIZE, 0f, CellOffset.Y + WorldManager.CELL_SIZE)
             );
-        BaiLoader = new BaseBaiLoader[4, 4]
+        BaiLoader = new BaseBaiLoader[,]
         {
             { null, null, null, null },
             { null, null, null, null },
@@ -97,17 +99,143 @@ public class WorldCell
         {
             for (var x = 0; x < 4; x++)
             {
+                // var baiOffset = CellOffset + new Vector3(x * WorldManager.PATHS_SIZE, y * WorldManager.PATHS_SIZE, 0);
                 var pathX = (uint)(CellX * 4 + x);
                 var pathY = (uint)(CellY * 4 + y);
                 var pathFolder = $"{pathX:000}_{pathY:000}";
                 var pathBaiLoader = new BaseBaiLoader(Template);
                 pathBaiLoader.LoadBaiFilesFromFolder(pathFolder); // (x != 0 || y != 0)
                 BaiLoader[x, y] = pathBaiLoader;
-                if (!Template.PathBaiLoader.TryAdd((pathX, pathY), pathBaiLoader))
-                    Logger.Warn($"PathBaiLoader already contains key ({pathX}, {pathY}) for template {Template.Name}");
+                Template.PathBaiLoader.Add((pathX, pathY), pathBaiLoader);
+                // TODO: Temporary disabled fake nodes until re-implemented
+                // GenerateFakeIntermediateNodes(pathBaiLoader, baiOffset, pathX, pathY);
             }
         }
     }
+    
+    public long GenerateFakeIntermediateNodes(BaseBaiLoader baiLoader, Vector3 offset, uint pathX, uint pathY)
+    {
+        var timer = new Stopwatch();
+        timer.Start();
+        long newCount = 0;
+        var stepSize = 6; // Size 6m Creates 43x43 points on empty region (1849)
+
+        // First find the average height for all the netmission points in this .bai file
+        // This will be used as our default "check locations" height. This is to avoid scanning from a zero-height position
+        /*
+        var averageHeight = 0f;
+        var count = 0;
+        foreach (var netMission in baiLoader.NetMissionReaders)
+        {
+            foreach (var node in netMission.NodeDescriptorList.Values)
+            {
+                averageHeight += node.Pos.Z;
+                count++;
+            }
+        }
+        if (count > 0)
+        {
+            averageHeight /= count;
+        }
+        */
+
+        // new position, nearest old node found
+        foreach (var netMission in baiLoader.NetMissionReaders)
+        {
+            var newNodesToAdd = new Dictionary<(int, int), NodeDescriptor>();
+            var addedNodes = new Dictionary<(int, int), NodeDescriptor>();
+            // Check "open spots" in the navmesh and mark them
+            for (var y = 0; y < WorldManager.PATHS_SIZE; y += stepSize)
+            {
+                for (var x = 0; x < WorldManager.PATHS_SIZE; x += stepSize)
+                {
+                    var checkPos = offset + new Vector3(x, y, 0f);//averageHeight);
+                    var nearestNode = baiLoader.FindClosestNetMissionNode(checkPos, 0, ignoreHeight: true);
+                    // Check if the result it from the same NetMission file we want to check
+                    if (nearestNode.NetMission != netMission)
+                        continue; 
+                    var distanceCheck = (checkPos - nearestNode.Pos).Length2D();
+                    // var heightDifferenceCheck = Math.Abs(nearestNode.Pos.Z - checkPos.Z);
+                    // If it's further than 2m away from the nearest node and not too steep, generate a new one
+                    if (distanceCheck > stepSize * 2)// && (heightDifferenceCheck / (distanceCheck + 1f) < 0.5f))
+                    {
+                        newCount++;
+                        newNodesToAdd.Add((x, y), nearestNode);
+                    }
+                }
+            }
+
+            // Actually add the points and their links to original nodes
+            var lastUsedNodeId = netMission.NodeDescriptorList.Values.Max(x => x.Id);
+            for (var y = 0; y < WorldManager.PATHS_SIZE; y += stepSize)
+            {
+                for (var x = 0; x < WorldManager.PATHS_SIZE; x += stepSize)
+                {
+                    if (!newNodesToAdd.TryGetValue((x, y), out var nearestNode))
+                        continue;
+                    lastUsedNodeId++;
+                    var posToAdd = offset + new Vector3(x, y, nearestNode.Pos.Z); // copy over from nearest node
+                    // Create new node
+                    var newNode = new NodeDescriptor(netMission)
+                    {
+                        Id = lastUsedNodeId,
+                        Pos = posToAdd,
+                        Type = 99, // Mark them as custom floor
+                    };
+                    if (netMission.NodeDescriptorList.TryAdd(newNode.Id, newNode))
+                        addedNodes.Add((x, y), newNode);
+
+                    // Create new 2-directional link to nearest original node
+                    netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { TargetNode = lastUsedNodeId, TargetNodeDescriptor = newNode, SourceNode = nearestNode.Id, SourceNodeDescriptor = nearestNode });
+                    netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { SourceNode = lastUsedNodeId, SourceNodeDescriptor = newNode, TargetNode = nearestNode.Id, TargetNodeDescriptor = nearestNode });
+                }
+            }
+
+            // Create cross-links between our newly generated node
+            for (var y = 0; y < WorldManager.PATHS_SIZE-stepSize; y += stepSize)
+            {
+                for (var x = 0; x < WorldManager.PATHS_SIZE-stepSize; x += stepSize)
+                {
+                    if (!addedNodes.TryGetValue((x, y), out var newNode))
+                        continue;
+                    
+                    // Just checking against Right and Bottom sides should be enough to handle the entire list of newly generated items
+                    // Right
+                    if (addedNodes.TryGetValue((x + stepSize, y), out var nodeR))
+                    {
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { TargetNode = newNode.Id, TargetNodeDescriptor = newNode, SourceNode = nodeR.Id, SourceNodeDescriptor = nodeR});
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { SourceNode = newNode.Id, SourceNodeDescriptor = newNode, TargetNode = nodeR.Id, TargetNodeDescriptor = nodeR});
+                    }
+                    // Bottom (Top on map)
+                    if (addedNodes.TryGetValue((x, y + stepSize), out var nodeB))
+                    {
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { TargetNode = newNode.Id, TargetNodeDescriptor = newNode, SourceNode = nodeB.Id, SourceNodeDescriptor = nodeB});
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { SourceNode = newNode.Id, SourceNodeDescriptor = newNode, TargetNode = nodeB.Id, TargetNodeDescriptor = nodeB});
+                    }
+                    // Bottom-Right (Top-Right on map)
+                    if (addedNodes.TryGetValue((x + stepSize, y + stepSize), out var nodeBr))
+                    {
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { TargetNode = newNode.Id, TargetNodeDescriptor = newNode, SourceNode = nodeBr.Id, SourceNodeDescriptor = nodeBr});
+                        netMission.LinkDescriptorList.Add(new LinkDescriptor(netMission) { SourceNode = newNode.Id, SourceNodeDescriptor = newNode, TargetNode = nodeBr.Id, TargetNodeDescriptor = nodeBr});
+                    }
+                }
+            }
+            if (pathX == 88 && pathY == 31)
+            {
+                // Debug here
+            }
+
+        }
+        timer.Stop();
+        if (newCount > 0 && timer.ElapsedMilliseconds > 100)
+        {
+            Logger.Debug($"Generate FakeIntermediateNodes: {newCount} generated nodes in {timer.ElapsedMilliseconds}ms for {Template.Name}, Cell {this}, Path {pathX:000}_{pathY:000}");
+        }
+
+        return newCount;
+    }
+
+
 
     /// <summary>
     /// Checks if the cell is loaded and loads it if it hasn't 
@@ -250,12 +378,13 @@ public class WorldCell
         }
 
         // Update Physics world's heightmaps
-        foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id))
+        foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id).ToArray())
         {
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
             // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
             worldInstance.Water.AddFromCellData(this);
             worldInstance.Physics?.AddVoxelTerrain(this);
+            worldInstance.Physics?.ReAlignLoadedBaiNodePoints(this);
         }
         
 #if EXPORT_CELL_ON_LOAD
@@ -334,5 +463,10 @@ public class WorldCell
     public Vector3 GetCellWorldOffset()
     {
         return new Vector3(CellX * WorldManager.CELL_SIZE, CellY * WorldManager.CELL_SIZE, 0f);
+    }
+
+    public override string ToString()
+    {
+        return $"{CellX:000}_{CellY:000}";
     }
 }

@@ -126,6 +126,8 @@ public class TestAI : ICommand
                     $"AI Path has {npc.Ai.PathHandler.AiPathPoints.Count} points ({npc.Ai.PathHandler.AiPathPointsRemaining.Count} remaining in queue)");
                 CommandManager.SendNormalText(this, messageOutput,
                     $"AI Commands has {npc.Ai.AiCommandsQueue.Count} actions in queue");
+                CommandManager.SendNormalText(this, messageOutput,
+                    $"AI Move to Aggro Target has {npc.Ai.PathNode.FoundPath.Count} positions in queue (next: {npc.Ai.PathNode.FoundPath.Peek()})");
                 if (npc.Spawner != null)
                 {
                     CommandManager.SendNormalText(this, messageOutput,

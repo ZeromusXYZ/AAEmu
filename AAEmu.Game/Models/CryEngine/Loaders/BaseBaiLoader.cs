@@ -1,4 +1,3 @@
-using System.IO;
 using System.Numerics;
 using AAEmu.Commons.Exceptions;
 using NLog;
@@ -6,6 +5,7 @@ using AAEmu.Game.IO;
 using AAEmu.Game.Models.CryEngine.Entities;
 using AAEmu.Game.Models.CryEngine.Readers;
 using AAEmu.Game.Models.Game.World;
+using AAEmu.Game.Utils;
 
 namespace AAEmu.Game.Models.CryEngine.Loaders;
 
@@ -14,17 +14,17 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
     private WorldTemplate ParentWorldTemplate { get; } = parentWorldTemplate;
 
-    public bool LoadAreasMission { get; set; } = false;
+    public bool LoadAreasMission { get; set; } = true; // Contains Forbidden area data
     public List<AreasMissionReader> AreasMissionReaders { get; } = [];
 
     public bool LoadNetMission { get; set; } = true;
     public List<NetMissionReader> NetMissionReaders { get; } = [];
 
-    public bool LoadVertexMission { get; set; } = false;
-    public List<VertexMissionReader> VertexMissionReaders { get; } = [];
+    private bool LoadVertexMission { get; set; } = false;
+    private List<VertexMissionReader> VertexMissionReaders { get; } = [];
 
-    public bool LoadHideMission { get; set; } = false;
-    public List<NetMissionReader> HideMissionReaders { get; } = [];
+    private bool LoadHideMission { get; set; } = false;
+    private List<NetMissionReader> HideMissionReaders { get; } = [];
 
     /// <summary>
     /// Loads .bai files data from a given zone or path folder
@@ -81,8 +81,7 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
                     }
                     catch (Exception ex)
                     {
-                        Logger.Debug(
-                            $"Areas File Exception: {ex}, in {areaFile}, area offset {targetOffset}, skipping the rest of this file");
+                        Logger.Debug($"Areas File Exception: {ex}, in {areaFile}, area offset {targetOffset}, skipping the rest of this file");
                         // continue;
                     }
                 }
@@ -259,13 +258,13 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
         HideMissionReaders.Clear();
     }
 
-    public NodeDescriptor FindClosestNetMissionNode(Vector3 pos, byte onlyNodeTypes)
+    public NodeDescriptor FindClosestNetMissionNode(Vector3 pos, byte onlyNodeTypes, bool ignoreHeight = false)
     {
         NodeDescriptor nearestNode = null;
         var nearestDistance = float.MaxValue;
         foreach (var netMissionReader in NetMissionReaders)
         {
-            foreach (var (index, nodeDescriptor) in netMissionReader.NodeDescriptorList)
+            foreach (var (_, nodeDescriptor) in netMissionReader.NodeDescriptorList)
             {
                 if (onlyNodeTypes > 0 && onlyNodeTypes != nodeDescriptor.Type)
                     continue;
@@ -273,10 +272,15 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
                 if (nearestNode == null)
                 {
                     nearestNode = nodeDescriptor;
-                    nearestDistance = (nearestNode.Pos - pos).Length();
+                    nearestDistance = ignoreHeight
+                        ? (nearestNode.Pos - pos).Length2D()
+                        : (nearestNode.Pos - pos).Length();
                     continue;
                 }
-                var thisDistance = (pos - nodeDescriptor.Pos).Length();
+
+                var thisDistance = ignoreHeight
+                    ? (pos - nodeDescriptor.Pos).Length2D()
+                    : (pos - nodeDescriptor.Pos).Length();
                 if (thisDistance < nearestDistance)
                 {
                     nearestNode = nodeDescriptor;

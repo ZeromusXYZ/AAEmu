@@ -3,6 +3,7 @@
 using AAEmu.Game.Models.CryEngine.Entities;
 using AAEmu.Game.Models.CryEngine.Loaders;
 using AAEmu.Game.Models.CryEngine.Mission;
+using AAEmu.Game.Models.CryEngine.Readers;
 using AAEmu.Game.Models.Game.AI.AStar;
 using AAEmu.Game.Models.Game.World;
 using AAEmu.Game.Utils;
@@ -172,10 +173,10 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
     /// <returns></returns>
     private static double PerpendicularDistance(Vector3 point1, Vector3 point2, Vector3 targetPoint)
     {
-        //Area = |(1/2)(x1y2 + x2y3 + x3y1 - x2y1 - x3y2 - x1y3)|   *Area of triangle
-        //Base = v((x1-x2)²+(x1-x2)²)                               *Base of Triangle*
-        //Area = .5*Base*H                                          *Solve for height
-        //Height = Area/.5/Base
+        // Area = |(1/2)(x1y2 + x2y3 + x3y1 - x2y1 - x3y2 - x1y3)|   *Area of triangle
+        // Base = v((x1-x2)²+(x1-x2)²)                               *Base of Triangle*
+        // Area = .5*Base*H                                          *Solve for height*
+        // Height = Area/.5/Base
 
         var area = Math.Abs(.5 * (point1.X * point2.Y + point2.X * targetPoint.Y + targetPoint.X * point1.Y - point2.X * point1.Y - targetPoint.X * point2.Y - point1.X * targetPoint.Y));
         var bottom = Math.Sqrt(Math.Pow(point1.X - point2.X, 2) + Math.Pow(point1.Y - point2.Y, 2));
@@ -198,6 +199,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         if (cell == null)
             return null;
         
+        /*
         var nearbyHeightMapPoints = worldTemplate.GetNearbyFloorHeightPoints(pos.X, pos.Y);
         foreach (var v3 in nearbyHeightMapPoints)
         {
@@ -208,6 +210,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                 minDist = distance;
             }
         }
+        */
 
         List<BaseBaiLoader> toCheckChunkList = [];
         if (cell.Template.ZoneBaiLoader.Count > 0)
@@ -246,8 +249,8 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                 foreach (var (_, nodeDescriptor) in netMission.NodeDescriptorList)
                 {
                     // Filter node types if needed
-                    if (onlyNodeTypes > 0 && nodeDescriptor.Type != onlyNodeTypes)
-                        continue;
+                    // if (onlyNodeTypes > 0 && nodeDescriptor.Type != onlyNodeTypes)
+                    //    continue;
                     var distance = (nodeDescriptor.Pos - pos).Length();
                     if (distance < minDist)
                     {
@@ -276,8 +279,8 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
         float res;
         //var stopWatch = new Stopwatch();
         //stopWatch.Start();
-        var rawFloorPos = pos with { Z = worldTemplate.GetHeight(pos.X, pos.Y) };
-        var rawFloorDelta = pos.Z - rawFloorPos.Z;
+        //var rawFloorPos = pos with { Z = worldTemplate.GetHeight(pos.X, pos.Y) };
+        //var rawFloorDelta = pos.Z - rawFloorPos.Z;
 
         // Try to get height from .bai files data
         try
@@ -352,6 +355,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                (compareTo.Y - point.Y) * (compareTo.Y - point.Y);
     }
 
+/*    
     private static Vector3 FindClosest(List<AiNavigation> searchIn, Vector3 compareTo)
     {
         return searchIn
@@ -367,6 +371,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
             .OrderBy(distances => distances.distance)
             .First().point;
     }
+*/
 
     /// <summary>
     /// Find the nearest point
@@ -396,7 +401,7 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
 
     public void Load()
     {
-        // Nothing to load here anymore, everything
+        // Nothing to load here anymore, everything has been move to cell loader
     }
 
     public Queue<Vector3> ReducePath(List<Vector3> foundPath, int maxNodeSkipCount)
@@ -416,12 +421,13 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
                     continue;
                 var endNode = foundPath[endNodeIndex];
                 // Skip this node if the height offset is too much
-                var delta = endNode - startNode;
-                var angleRate = delta.Length() > 0 ? delta.Z / delta.Length() : 0f;
-                if (angleRate >= 0.2f || angleRate <= -0.5f)
-                    continue;
+                //var delta = endNode - startNode;
+                //var angleRate = delta.Length() > 0 ? delta.Z / delta.Length() : 0f;
+                // TODO: Temporary disabled angle check
+                //if (angleRate >= 0.2f || angleRate <= -0.5f)
+                //    continue;
                 // Check if there's a direct line between the two nodes that is allowed
-                if (LinePassesThroughForbiddenArea(startNode, endNode) == false)
+                if (LinePassesThroughForbiddenArea(startNode, endNode, [], true, out _, out _, out _, 10f) == false)
                 {
                     // If clear, directly put this point as next, and move the check index
                     res.Enqueue(endNode);
@@ -442,21 +448,46 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
     /// <param name="shape"></param>
     /// <param name="closedLoop">Is the shape a closed loop</param>
     /// <param name="maxHeightOffset">Maximum height difference required for the intersection to count as valid</param>
-    /// <returns></returns>
-    private bool LinePassesThroughAiShape(Vector3 startPos, Vector3 endPos, AiShape shape, bool closedLoop, float maxHeightOffset)
+    /// <param name="ignoreCorners"></param>
+    /// <param name="intersectionPoint">Returns the closest intersection point in this shape to startPos</param>
+    /// <param name="intersectionPointStartIndex">Returns the point index of the line segment that intersectionPoint or -1 if nothing was found</param>
+    /// <returns>Returns true if at least one intersection happened</returns>
+    private static bool LinePassesThroughAiShape(Vector3 startPos, Vector3 endPos, AiShape shape, bool closedLoop, float maxHeightOffset, bool ignoreCorners, out Vector3 intersectionPoint, out int intersectionPointStartIndex)
     {
-        for (var index = 0; index < shape.Points.Count + (closedLoop ? 0 : -1); index++)
+        intersectionPoint =  Vector3.Zero;
+        intersectionPointStartIndex = -1;
+        var maxIndexToStart = shape.Points.Count + (closedLoop ? 0 : -1);
+
+        for (var index = 0; index < maxIndexToStart; index++)
         {
             var lineStart = shape.Points[index];
-            var lineEnd = index < shape.Points.Count-1 ? shape.Points[index + 1] : shape.Points[0];
-            var intersectionPoint = FindLineIntersection(startPos, endPos, lineStart, lineEnd); 
-            if (intersectionPoint != Vector3.Zero)
+            var lineEnd = index < maxIndexToStart-1 ? shape.Points[index + 1] : shape.Points[0];
+            if (ignoreCorners && (
+                    Vector3.Distance(startPos, lineStart) <= 0.01f ||
+                    Vector3.Distance(startPos, lineEnd) <= 0.01f ||
+                    Vector3.Distance(endPos, lineStart) <= 0.01f ||
+                    Vector3.Distance(endPos, lineEnd) <= 0.01f))
             {
-                if (maxHeightOffset == 0f || MathF.Abs(intersectionPoint.Z - startPos.Z) <= maxHeightOffset || MathF.Abs(intersectionPoint.Z - endPos.Z) <= maxHeightOffset)
-                    return true;
+                continue;
+            }
+
+            var iPoint = FindLineIntersection(startPos, endPos, lineStart, lineEnd); 
+            if (iPoint != Vector3.Zero)
+            {
+                // Check for height difference if wanted
+                if (maxHeightOffset == 0f || MathF.Abs(iPoint.Z - startPos.Z) <= maxHeightOffset || MathF.Abs(iPoint.Z - endPos.Z) <= maxHeightOffset)
+                {
+                    // If first match or a closer match to starting point, then update the point and index  
+                    if (intersectionPointStartIndex < 0 || Vector3.Distance(startPos, iPoint) > Vector3.Distance(intersectionPoint, iPoint))
+                    {
+                        intersectionPoint = iPoint;
+                        intersectionPointStartIndex = index;
+                    }
+                }
             }
         }
-        return false;
+
+        return (intersectionPointStartIndex >= 0);
     }
 
     /// <summary>
@@ -464,32 +495,103 @@ public class AiGeoDataManager(WorldTemplate worldTemplate)
     /// </summary>
     /// <param name="startNode"></param>
     /// <param name="endNode"></param>
+    /// <param name="ignoredShapeNames"></param>
+    /// <param name="ignoreCorners"></param>
+    /// <param name="intersectionShape"></param>
+    /// <param name="intersectionPoint"></param>
+    /// <param name="intersectionLinePointStartIndex"></param>
+    /// <param name="maxHeightOffset">if set to 0f it ignores height differences</param>
     /// <returns></returns>
-    private bool LinePassesThroughForbiddenArea(Vector3 startNode, Vector3 endNode)
+    public bool LinePassesThroughForbiddenArea(Vector3 startNode, Vector3 endNode, List<string> ignoredShapeNames, bool ignoreCorners, out AiShape intersectionShape, out Vector3 intersectionPoint, out int intersectionLinePointStartIndex, float maxHeightOffset = 8f)
     {
         // It should be enough to grab the starting node's bai data. Forbidden zones are defined if even part of the zone falls within the area
+        intersectionPoint = Vector3.Zero;
+        intersectionLinePointStartIndex = -1;
+        var intersectionPointDistance = float.PositiveInfinity;
+        intersectionShape = null;
         var sourceBai = worldTemplate.GetBaiByPos(startNode);
-        foreach (var areaMission in sourceBai.AreasMissionReaders)
+        //var endBai = worldTemplate.GetBaiByPos(endNode);
+        var areaReaders = new List<AreasMissionReader>();
+        areaReaders.AddRange(sourceBai.AreasMissionReaders);
+        /*
+        if (endBai != null && endBai != sourceBai)
+        {
+            areaReaders.AddRange(endBai.AreasMissionReaders);
+        }
+        */
+
+        foreach (var areaMission in areaReaders)
         {
             // Loop forbidden areas shape
             foreach (var aiShape in areaMission.ForbiddenAreasList)
             {
-                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, 8f))
-                    return true;
+                if (ignoredShapeNames.Contains(aiShape.Name))
+                {
+                    continue;
+                }
+                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, maxHeightOffset, ignoreCorners, out var hitTest, out var hitIndex))
+                {
+                    var hitDistance = Vector3.Distance(startNode, hitTest);
+                    if (intersectionLinePointStartIndex < 0 || hitDistance < intersectionPointDistance)
+                    {
+                        intersectionShape = aiShape;
+                        intersectionPoint = hitTest;
+                        intersectionLinePointStartIndex = hitIndex;
+                        intersectionPointDistance = hitDistance;
+                    }
+                    // return true;
+                }
             }
 
+            /*
             foreach (var aiShape in areaMission.ForbiddenBoundariesList)
             {
-                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, 8f))
-                    return true;
+                if (ignoredShapeNames.Contains(aiShape.Name))
+                {
+                    continue;
+                }
+                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, maxHeightOffset, out var hitTest, out var hitIndex))
+                {
+                    var hitDistance = Vector3.Distance(startNode, hitTest);
+                    if (intersectionLinePointStartIndex < 0 || hitDistance < intersectionPointDistance)
+                    {
+                        intersectionShape = aiShape;
+                        intersectionPoint = hitTest;
+                        intersectionLinePointStartIndex = hitIndex;
+                        intersectionPointDistance = hitDistance;
+                    }
+                    // return true;
+                }
             }
 
             foreach (var aiShape in areaMission.DesignerForbiddenAreasList)
             {
-                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, 8f))
-                    return true;
+                if (ignoredShapeNames.Contains(aiShape.Name))
+                {
+                    continue;
+                }
+                if (LinePassesThroughAiShape(startNode, endNode, aiShape, true, maxHeightOffset, out var hitTest, out var hitIndex))
+                {
+                    var hitDistance = Vector3.Distance(startNode, hitTest);
+                    if (intersectionLinePointStartIndex < 0 || hitDistance < intersectionPointDistance)
+                    {
+                        intersectionShape = aiShape;
+                        intersectionPoint = hitTest;
+                        intersectionLinePointStartIndex = hitIndex;
+                        intersectionPointDistance = hitDistance;
+                    }
+                    // return true;
+                }
             }
+            */
         }
+
+        if (intersectionLinePointStartIndex >= 0 && intersectionShape != null)
+        {
+            return true;
+        }
+
+        intersectionShape = null;
         return false;
     }
 

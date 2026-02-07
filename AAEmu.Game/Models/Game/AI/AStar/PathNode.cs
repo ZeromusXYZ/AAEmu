@@ -74,25 +74,25 @@ public class PathNode
     /// Basic method of route calculation.
     /// </summary>
     /// <param name="world"></param>
-    /// <param name="start"></param>
-    /// <param name="goal"></param>
+    /// <param name="goalLocation"></param>
     /// <param name="containsDifferentNodeTypes"></param>
+    /// <param name="startLocation"></param>
     /// <returns></returns>
     public List<Vector3> FindPath(WorldInstance world, Vector3 startLocation, Vector3 goalLocation, out bool containsDifferentNodeTypes)
     {
         containsDifferentNodeTypes = false;
         var startNodeType = 2;
         // Find the nearest point from the start point in the list of geodata points and start the search from it.
-        var posStart = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(startLocation.X, startLocation.Y, startLocation.Z), 4);
+        var posStart = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, startLocation, 0);
         if ((posStart != null && (posStart.Pos - startLocation).Length() < 5f))
         {
             startNodeType = posStart.Type;
         }
         else
         {
-            posStart = new NodeDescriptor(null) { Pos = startLocation with { Z = world.Template.GetHeight(startLocation.X, startLocation.Y) }};
+            posStart = new NodeDescriptor(null) { Pos = startLocation with { Z = world.GetHeight(startLocation) }};
         }
-        var posEnd = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, new Vector3(goalLocation.X, goalLocation.Y, goalLocation.Z), 4);
+        var posEnd = world.Template.GeoData.FindСlosestToTheCurrent(ZoneKey, goalLocation, 0);
         //if (posEnd != null)
         //    goal = posEnd.Pos;// replace it with the nearest point from the geodata
 
@@ -103,7 +103,7 @@ public class PathNode
         }
         else
         {
-            posEnd = new NodeDescriptor(null) { Pos = goalLocation with { Z = world.Template.GetHeight(goalLocation.X, goalLocation.Y) }};
+            posEnd = new NodeDescriptor(null) { Pos = goalLocation with { Z = world.GetHeight(goalLocation) }};
             if (startNodeType != 2)
                 containsDifferentNodeTypes = true;
         }
@@ -123,7 +123,7 @@ public class PathNode
             EndPointPos = goalLocation,
             CameFrom = null,
             PathLengthFromStart = 0,
-            PathLengthToEnd = GetHeuristicPathLength(startLocation),
+            PathLengthToEnd = (startLocation - EndPointPos).Length2D(), // GetHeuristicPathLength(startLocation),
             NodeType = posStart.Type
         };
         openSet.Add(startNode);
@@ -253,10 +253,12 @@ public class PathNode
                 Position = linkDescriptor.TargetNodeDescriptor.Pos,
                 EndPointPos = pathNode.EndPointPos,
                 CameFrom = pathNode,
-                PathLengthFromStart = (linkDescriptor.SourceNodeDescriptor.Pos - pathNode.EndPointPos).Length(), // GetDistanceFromStart(linkDescriptor.SourceNodeDescriptor.Pos),
-                PathLengthToEnd = (linkDescriptor.TargetNodeDescriptor.Pos - pathNode.EndPointPos).Length() // GetHeuristicPathLength(linkDescriptor.TargetNodeDescriptor.Pos)
+                PathLengthFromStart = (linkDescriptor.SourceNodeDescriptor.Pos - pathNode.EndPointPos).Length2D(), // GetDistanceFromStart(linkDescriptor.SourceNodeDescriptor.Pos),
+                PathLengthToEnd = (linkDescriptor.TargetNodeDescriptor.Pos - pathNode.EndPointPos).Length2D() // GetHeuristicPathLength(linkDescriptor.TargetNodeDescriptor.Pos)
             };
 
+            // Align to solid floor
+            neighbourNode.Position = neighbourNode.Position with { Z = world.GetHeight(neighbourNode.Position) };
             result.Add(neighbourNode);
         }
 
