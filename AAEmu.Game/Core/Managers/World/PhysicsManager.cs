@@ -5,7 +5,9 @@ using System.Diagnostics;
 using System.Numerics;
 
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.IO;
 using AAEmu.Game.Models;
+using AAEmu.Game.Models.CryEngine;
 using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Units;
@@ -28,6 +30,7 @@ namespace AAEmu.Game.Core.Managers.World;
 public class PhysicsManager
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
+
     /// <summary>
     /// WorldInstance this physics engine is running for
     /// </summary>
@@ -40,6 +43,7 @@ public class PhysicsManager
     /// </summary>
     // TODO: Make this variable or configurable from a GM command or dynamic load system
     public float TargetPhysicsTps { get; set; } = AppConfiguration.Instance.World.TargetPhysicsTps;
+
     public float TargetPhysicsTickTime => 1f / TargetPhysicsTps;
     internal Thread _thread;
 
@@ -52,6 +56,7 @@ public class PhysicsManager
     /// Buoyancy handler for ships
     /// </summary>
     public Buoyancy Buoyancy { get; private set; }
+
     internal bool ThreadRunning { get; set; }
 
     /// <summary>
@@ -60,10 +65,12 @@ public class PhysicsManager
     private readonly Dictionary<uint, ShipController> _shipControllers = new();
 
     private readonly ConcurrentQueue<Action> _pendingActions = new();
+
     // ReSharper disable once ChangeFieldTypeToSystemThreadingLock
     private readonly object _worldLock = new();
     private readonly List<RigidBody> _bodies = [];
-    public List<RigidBody> VoxelObjects { get; init; }= [];
+    public List<RigidBody> VoxelObjects { get; init; } = [];
+    public List<RigidBody> BrushObjects { get; init; } = [];
 
     /// <summary>
     /// Used heightmap tester, saved so it can be edited later
@@ -78,10 +85,13 @@ public class PhysicsManager
         PhysWorld = new Jitter2.World();
         PhysWorld.Gravity = new JVector(0, -9.81f, 0);
 
-        Buoyancy = new Buoyancy(PhysWorld) {
+        Buoyancy = new Buoyancy(PhysWorld)
+        {
             FluidBox = new JBoundingBox(
                 new JVector(0, 0, 0), // Bottom
-                new JVector(SimulationWorld.Template.CellX * WorldManager.CELL_SIZE, SimulationWorld.Template.OceanLevel, SimulationWorld.Template.CellY * WorldManager.CELL_SIZE) // Surface
+                new JVector(SimulationWorld.Template.CellX * WorldManager.CELL_SIZE,
+                    SimulationWorld.Template.OceanLevel,
+                    SimulationWorld.Template.CellY * WorldManager.CELL_SIZE) // Surface
             )
         };
         Buoyancy.UseOwnFluidArea(CustomWater);
@@ -118,7 +128,8 @@ public class PhysicsManager
 
                 if (AppConfiguration.Instance.World.PreLoadTerrain)
                 {
-                    Logger.Debug($"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells");
+                    Logger.Debug(
+                        $"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells");
 
                     // Read the data
                     var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
@@ -193,7 +204,9 @@ public class PhysicsManager
 
             while (ThreadRunning)
             {
-                var targetStepTime = TimeSpan.FromSeconds(TargetPhysicsTickTime);
+                // Reduce tick speed to 1/4th when loading terrain objects
+                var loadBalanceMultiplier = SimulationWorld.WorldCellTerrainLoadingTask == null ? 1f : 5f;
+                var targetStepTime = TimeSpan.FromSeconds(TargetPhysicsTickTime * loadBalanceMultiplier);
                 var currentTick = TimeSpan.FromMilliseconds(Environment.TickCount64);
                 var timeSinceLastTick = currentTick - lastTick;
                 accumulatedTime += timeSinceLastTick;
@@ -203,19 +216,27 @@ public class PhysicsManager
                 {
                     Thread.Sleep((int)timeToNextStep.TotalMilliseconds);
                 }
-                else
-                if (timeToNextStep.TotalMilliseconds < -TargetPhysicsTps)
+                else if (timeToNextStep.TotalMilliseconds < -TargetPhysicsTps)
                 {
-                    // If it's taking more than double the expected time, toss a warning
-                    Logger.Warn($"Physics thread is running slow in {SimulationWorld} at {timeSinceLastTick.TotalMilliseconds:F1} / {targetStepTime.TotalMilliseconds:F1} ms");
+                    // If it's taking more than double the expected time, toss a warning if not loading terrain objects
+                    if (SimulationWorld.WorldCellTerrainLoadingTask == null || timeToNextStep.TotalMilliseconds < (TargetPhysicsTps * -10f))
+                    {
+                        Logger.Warn($"Physics thread is running slow in {SimulationWorld} at {timeSinceLastTick.TotalMilliseconds:F1} / {targetStepTime.TotalMilliseconds:F1} ms ({PhysWorld.RigidBodies.Count} RigidBodies)");
+                    }
                 }
 
-                var physicsTotalDelta = TimeSpan.FromMilliseconds(Environment.TickCount64) - lastTick; 
+                var physicsTotalDelta = TimeSpan.FromMilliseconds(Environment.TickCount64) - lastTick;
                 lastTick = currentTick;
 
                 // 1. Process pending add/remove actions
                 while (_pendingActions.TryDequeue(out var action)) { action(); }
 
+                if (SimulationWorld.WorldCellTerrainLoadingTask != null)
+                {
+                    // Skip physics if loading data
+                    continue;
+                }
+                
                 List<(RigidBody body, JVector vel, bool moving)> snapshot = [];
 
                 lock (_worldLock)
@@ -267,7 +288,8 @@ public class PhysicsManager
                                 continue;
 
                             // TODO: move this
-                            var underPos = slave.Transform.World.Position + Vector3.UnitZ * (slave.ShipController?.ShipModel.MassBoxSizeZ ?? 1f) / -2f * slave.Scale;
+                            var underPos = slave.Transform.World.Position + Vector3.UnitZ *
+                                (slave.ShipController?.ShipModel.MassBoxSizeZ ?? 1f) / -2f * slave.Scale;
                             if (SimulationWorld.Water.IsWater(underPos, out var flowDirection))
                             {
                                 if (flowDirection.Length() > 0f)
@@ -275,7 +297,10 @@ public class PhysicsManager
                                     // We are in moving water, apply force
                                     // var multiplier = slave.RigidBody.Mass / TargetPhysicsTickTime;
                                     // slave.RigidBody.AddForce(new JVector(flowDirection.X * multiplier, flowDirection.Z * multiplier, flowDirection.Y * multiplier));
-                                    slave.RigidBody.Position += new JVector(flowDirection.X * (float)physicsTotalDelta.TotalSeconds,flowDirection.Z * (float)physicsTotalDelta.TotalSeconds, flowDirection.Y * (float)physicsTotalDelta.TotalSeconds);
+                                    slave.RigidBody.Position += new JVector(
+                                        flowDirection.X * (float)physicsTotalDelta.TotalSeconds,
+                                        flowDirection.Z * (float)physicsTotalDelta.TotalSeconds,
+                                        flowDirection.Y * (float)physicsTotalDelta.TotalSeconds);
                                 }
                             }
 
@@ -297,7 +322,8 @@ public class PhysicsManager
                         catch (Exception slaveException)
                         {
                             // Put a separate catch here to catch individual errors without it breaking all the physics in this world 
-                            Logger.Error($"PhysicsThread Error on Slave {slave.Id} {slave.Name} ({slave.ObjId}): {slaveException.Message}\n{slaveException.StackTrace}");
+                            Logger.Error(
+                                $"PhysicsThread Error on Slave {slave.Id} {slave.Name} ({slave.ObjId}): {slaveException.Message}\n{slaveException.StackTrace}");
                         }
                     }
                 }
@@ -348,7 +374,8 @@ public class PhysicsManager
             return;
         }
 
-        var pos = new JVector(slave.Transform.World.Position.X, slave.Transform.World.Position.Z, slave.Transform.World.Position.Y);
+        var pos = new JVector(slave.Transform.World.Position.X, slave.Transform.World.Position.Z,
+            slave.Transform.World.Position.Y);
         var rot = JQuaternion.CreateRotationY(slave.Transform.World.Rotation.Z);
         //                                     Width                   Length                  Height
         // var dimensions = new JVector(shipModel.MassBoxSizeX, shipModel.MassBoxSizeY, shipModel.MassBoxSizeZ);
@@ -404,7 +431,8 @@ public class PhysicsManager
         {
             // Apply ground friction and stop the ship
             const float GroundFriction = 0.4f; // Sand: around 0.4
-            var frictionForce = new JVector(-slave.RigidBody.Velocity.X * GroundFriction, 0, -slave.RigidBody.Velocity.Z * GroundFriction);
+            var frictionForce = new JVector(-slave.RigidBody.Velocity.X * GroundFriction, 0,
+                -slave.RigidBody.Velocity.Z * GroundFriction);
             slave.RigidBody.AddForce(frictionForce);
 
             // Gradually reduce speed
@@ -517,7 +545,8 @@ public class PhysicsManager
         }
 
         var penetration = slave.CachedFloorLevel - boatBottom;
-        slave.RigidBody.Position += new JVector(0, penetration, 0); // Move the boat upwards to put the center level with the floor
+        slave.RigidBody.Position +=
+            new JVector(0, penetration, 0); // Move the boat upwards to put the center level with the floor
         var collisionForce = PhysWorld.Gravity * -1f;
         slave.RigidBody.AddForce(collisionForce);
 
@@ -546,7 +575,8 @@ public class PhysicsManager
     /// <returns></returns>
     internal bool CustomWater(ref JVector area)
     {
-        return SimulationWorld?.IsWater(new Vector3(area.X, area.Z, area.Y), out _) ?? area.Y <= (SimulationWorld?.Template.OceanLevel ?? DefaultWaterLevel);
+        return SimulationWorld?.IsWater(new Vector3(area.X, area.Z, area.Y), out _) ??
+               area.Y <= (SimulationWorld?.Template.OceanLevel ?? DefaultWaterLevel);
     }
 
     /// <summary>
@@ -603,13 +633,7 @@ public class PhysicsManager
     {
         var jq = JQuaternion.CreateFromMatrix(matrix);
 
-        return new Quaternion
-        {
-            X = jq.X,
-            Y = jq.Y,
-            Z = jq.Z,
-            W = jq.W
-        };
+        return new Quaternion { X = jq.X, Y = jq.Y, Z = jq.Z, W = jq.W };
     }
 
     public void UpdateHeightMapFromCellBody(WorldCell cell)
@@ -630,6 +654,7 @@ public class PhysicsManager
                 WorldHeightMapTester.Heightmap.Materials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
             }
         }
+
         Logger.Trace($"Post-Loaded {SimulationWorld} Cell {cell.CellX}, {cell.CellY}");
     }
 
@@ -745,7 +770,7 @@ public class PhysicsManager
     public void InitializeWater()
     {
         SimulationWorld.Water.OceanLevel = SimulationWorld.Template.OceanLevel;
-        for(var y = 0; y < SimulationWorld.Template.CellY; y++)
+        for (var y = 0; y < SimulationWorld.Template.CellY; y++)
         for (var x = 0; x < SimulationWorld.Template.CellX; x++)
         {
             var cell = SimulationWorld.Template.GetCell(x, y);
@@ -755,65 +780,19 @@ public class PhysicsManager
         }
     }
 
-    private void AddVoxelTerrain(WorldCell cell, ObjectDataType6Voxel voxel)
-    {
-        var cellOffset = cell.GetCellWorldOffset().ToJVector();
-
-        if (voxel.MeshReader == null)
-            return;
-
-        lock (_worldLock)
-        {
-            var voxelObject = PhysWorld.CreateRigidBody();
-            voxelObject.Tag = voxel;
-            voxelObject.AffectedByGravity = false;
-            voxelObject.Position = new JVector(voxel.ModelTransformMatrix.M14, voxel.ModelTransformMatrix.M34, voxel.ModelTransformMatrix.M24);
-
-            var triangleList = new List<JTriangle>();
-            for (var i = 0; i < voxel.MeshReader.Indices.Count - 2; i += 3)
-            {
-                var i1 = voxel.MeshReader.Indices[i];
-                var i2 = voxel.MeshReader.Indices[i + 1];
-                var i3 = voxel.MeshReader.Indices[i + 2];
-                var v1 = new JVector(voxel.MeshReader.Vertices[i1].X, voxel.MeshReader.Vertices[i1].Z, voxel.MeshReader.Vertices[i1].Y);
-                var v2 = new JVector(voxel.MeshReader.Vertices[i2].X, voxel.MeshReader.Vertices[i2].Z, voxel.MeshReader.Vertices[i2].Y);
-                var v3 = new JVector(voxel.MeshReader.Vertices[i3].X, voxel.MeshReader.Vertices[i3].Z, voxel.MeshReader.Vertices[i3].Y);
-
-                triangleList.Add(new JTriangle(v1, v2, v3));
-            }
-
-            // Load triangles into a mesh
-            var voxelMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
-            // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
-            for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
-            {
-                var voxelShape = new TriangleShape(voxelMesh, i);
-                // Apply transform before adding
-                var m3X3 = new JMatrix(
-                    voxel.ModelTransformMatrix.M11, voxel.ModelTransformMatrix.M31, voxel.ModelTransformMatrix.M21,
-                    voxel.ModelTransformMatrix.M13, voxel.ModelTransformMatrix.M33, voxel.ModelTransformMatrix.M23,
-                    voxel.ModelTransformMatrix.M12, voxel.ModelTransformMatrix.M32, voxel.ModelTransformMatrix.M22);
-                var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
-                voxelObject.AddShape(transformedShape, false); // Has no mass
-            }
-
-            // Apply Cell offset after transform
-            voxelObject.Position += cellOffset;
-
-            // Mark the floor as static
-            voxelObject.IsStatic = true;
-
-            // Add to reference list
-            VoxelObjects.Add(voxelObject); // Need to save them here for faster heightmap floor collision testing
-        }
-    }
-
-    public void AddVoxelTerrain(WorldCell worldCell)
+    /// <summary>
+    /// Adds several static terrain objects from the objects.dat and visareas.dat files
+    /// Adds Voxel terrain
+    /// Adds Brush models (buildings/rocks/trees)
+    /// </summary>
+    /// <param name="worldCell"></param>
+    public void AddStaticTerrainVoxels(WorldCell worldCell)
     {
         if (worldCell == null)
             return;
 
         // Main objects list
+        var objectsLoadedCount = 0;
         if (worldCell.LoadedObjectDat != null)
         {
             foreach (var objectData in worldCell.LoadedObjectDat.PrefabsList)
@@ -822,7 +801,10 @@ public class PhysicsManager
                 {
                     if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
                     {
-                        AddVoxelTerrain(worldCell, voxel);
+                        if (AddVoxelTerrain(worldCell, voxel))
+                        {
+                            objectsLoadedCount++;
+                        }
                     }
                 }
             }
@@ -837,11 +819,240 @@ public class PhysicsManager
                 {
                     if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
                     {
-                        AddVoxelTerrain(worldCell, voxel);
+                        if (AddVoxelTerrain(worldCell, voxel))
+                        {
+                            objectsLoadedCount++;
+                        }
                     }
                 }
             }
         }
+
+        // Logger.Debug($"Loaded {objectsLoadedCount} voxel objects into Cell {worldCell}");
+    }
+
+    /// <summary>
+    /// Adds several static terrain objects from the objects.dat and visareas.dat files
+    /// Adds Voxel terrain
+    /// Adds Brush models (buildings/rocks/trees)
+    /// </summary>
+    /// <param name="worldCell"></param>
+    public void AddStaticTerrainObjects(WorldCell worldCell)
+    {
+        if (worldCell == null)
+            return;
+
+        // Main objects list
+        var objectsLoadedCount = 0;
+        if (worldCell.LoadedObjectDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedObjectDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType1Brush brush)
+                {
+                    if (AddBrushObject(worldCell, brush))
+                    {
+                        objectsLoadedCount++;
+                    }
+                }
+            }
+        }
+
+        // Objects list in visareas
+        if (worldCell.LoadedVisAreasDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedVisAreasDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType1Brush brush)
+                {
+                    if (AddBrushObject(worldCell, brush))
+                    {
+                        objectsLoadedCount++;
+                    }
+                }
+            }
+        }
+
+        Logger.Debug($"Loaded {objectsLoadedCount} brush objects into Cell {worldCell}");
+    }
+
+    /// <summary>
+    /// Adds a voxel object to a Cell
+    /// </summary>
+    /// <param name="cell"></param>
+    /// <param name="brush"></param>
+    private bool AddBrushObject(WorldCell cell, ObjectDataType1Brush brush)
+    {
+        var timer = new Stopwatch();
+        timer.Start();
+        var cellOffset = cell.GetCellWorldOffset().ToJVector();
+
+        RigidBody brushObject = null;
+
+        var modelPathName = string.Empty;
+        // Try model first
+        var triangleList = new List<JTriangle>();
+        if (brush.MaterialId > 0)
+        {
+            var materialPathName = (
+                cell.MaterialListFiles != null && brush.MaterialId < cell.MaterialListFiles.MaterialsList.Count
+            )
+                ? cell.MaterialListFiles.MaterialsList[brush.MaterialId]
+                : string.Empty;
+
+            modelPathName = (
+                cell.StatObjsFiles != null && brush.PathId < cell.StatObjsFiles.MaterialList.Count
+            )
+                ? cell.StatObjsFiles.MaterialList[brush.PathId]
+                : string.Empty;
+
+            // Fully ignore nodraw objects
+            if ((modelPathName == "game/objects/nodraw") || (materialPathName == "game/objects/nodraw"))
+            {
+                return false; // Don't draw, so not adding
+            }
+
+            if (!string.IsNullOrWhiteSpace(modelPathName) && ClientFileManager.FileExists(modelPathName))
+            {
+                triangleList = CryEngineModelHelper.MakeModel(modelPathName, materialPathName);
+            }
+
+            if (triangleList.Count <= 0)
+            {
+                // Logger.Warn($"Was unable to load brush model: {modelPathName} for {cell.Template.Name} Cell {cell}");
+                return false;
+            }
+        }
+
+        if (triangleList.Count <= 0)
+        {
+            return false;
+        }
+
+        // Load triangles into a mesh
+        var brushMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
+        // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
+        var shapesToAdd = new List<RigidBodyShape>();
+        for (var i = 0; i < brushMesh.Indices.Length - 2; i++)
+        {
+            var voxelShape = new TriangleShape(brushMesh, i);
+            // Apply transform before adding
+            var m3X3 = new JMatrix(
+                brush.Matrix3X4.M11, brush.Matrix3X4.M31, brush.Matrix3X4.M21,
+                brush.Matrix3X4.M13, brush.Matrix3X4.M33, brush.Matrix3X4.M23,
+                brush.Matrix3X4.M12, brush.Matrix3X4.M32, brush.Matrix3X4.M22);
+            var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+            shapesToAdd.Add(transformedShape);
+        }
+
+        lock (_worldLock)
+        {
+            // Only create the RigidBody if it has a texture and a shape
+            brushObject = PhysWorld.CreateRigidBody();
+            brushObject.Tag = brush;
+            brushObject.AffectedByGravity = false;
+            brushObject.Position = new JVector(brush.Matrix3X4.M14, brush.Matrix3X4.M34, brush.Matrix3X4.M24);
+
+            // Add the new shapes
+            foreach (var rigidBodyShape in shapesToAdd)
+            {
+                brushObject.AddShape(rigidBodyShape, false); // Has no mass
+            }
+
+            // Apply Cell offset after transform
+            brushObject.Position += cellOffset;
+
+            // Mark the floor as static
+            brushObject.IsStatic = true;
+            brushObject.SetActivationState(true);
+            EnqueueAddBody(brushObject);
+
+            // Add to reference list
+            // Need to save them here for faster heightmap floor collision testing later
+            BrushObjects.Add(brushObject);
+        }
+
+        // Logger.Trace($"Loaded brush object {modelPathName} into Cell {cell}");
+        // TODO: Implement Brush instances instead of create the model every time
+        timer.Stop();
+        if (timer.ElapsedMilliseconds > 1000)
+        {
+            Logger.Warn($"Loading object for {cell.Template.Name} Cell {cell} took {timer.ElapsedMilliseconds} ms: {modelPathName}");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a voxel object to a Cell
+    /// </summary>
+    /// <param name="cell"></param>
+    /// <param name="voxel"></param>
+    private bool AddVoxelTerrain(WorldCell cell, ObjectDataType6Voxel voxel)
+    {
+        var cellOffset = cell.GetCellWorldOffset().ToJVector();
+
+        if (voxel.MeshReader == null)
+            return false;
+
+        RigidBody voxelObject = null;
+        lock (_worldLock)
+        {
+            voxelObject = PhysWorld.CreateRigidBody();
+            voxelObject.Tag = voxel;
+            voxelObject.AffectedByGravity = false;
+            voxelObject.Position = new JVector(voxel.Matrix3X4.M14, voxel.Matrix3X4.M34, voxel.Matrix3X4.M24);
+        }
+
+        var triangleList = new List<JTriangle>();
+        for (var i = 0; i < voxel.MeshReader.Indices.Count - 2; i += 3)
+        {
+            var i1 = voxel.MeshReader.Indices[i];
+            var i2 = voxel.MeshReader.Indices[i + 1];
+            var i3 = voxel.MeshReader.Indices[i + 2];
+            var v1 = new JVector(voxel.MeshReader.Vertices[i1].X, voxel.MeshReader.Vertices[i1].Z,
+                voxel.MeshReader.Vertices[i1].Y);
+            var v2 = new JVector(voxel.MeshReader.Vertices[i2].X, voxel.MeshReader.Vertices[i2].Z,
+                voxel.MeshReader.Vertices[i2].Y);
+            var v3 = new JVector(voxel.MeshReader.Vertices[i3].X, voxel.MeshReader.Vertices[i3].Z,
+                voxel.MeshReader.Vertices[i3].Y);
+
+            triangleList.Add(new JTriangle(v1, v2, v3));
+        }
+
+        // Load triangles into a mesh
+        var voxelMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
+        // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
+        for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
+        {
+            var voxelShape = new TriangleShape(voxelMesh, i);
+            // Apply transform before adding
+            var m3X3 = new JMatrix(
+                voxel.Matrix3X4.M11, voxel.Matrix3X4.M31, voxel.Matrix3X4.M21,
+                voxel.Matrix3X4.M13, voxel.Matrix3X4.M33, voxel.Matrix3X4.M23,
+                voxel.Matrix3X4.M12, voxel.Matrix3X4.M32, voxel.Matrix3X4.M22);
+            var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+            lock (_worldLock)
+            {
+                voxelObject.AddShape(transformedShape, false); // Has no mass
+            }
+        }
+
+        lock (_worldLock)
+        {
+            // Apply Cell offset after transform
+            voxelObject.Position += cellOffset;
+
+            // Mark the floor as static
+            voxelObject.IsStatic = true;
+            voxelObject.SetActivationState(true);
+            EnqueueAddBody(voxelObject);
+
+            // Add to reference list
+            VoxelObjects.Add(voxelObject); // Need to save them here for faster heightmap floor collision testing
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -849,7 +1060,6 @@ public class PhysicsManager
     /// </summary>
     public void ReAlignLoadedBaiNodePoints(WorldCell worldCell)
     {
-        return; // temporary disable
         var timer = new Stopwatch();
         timer.Start();
         //lock (_worldLock)

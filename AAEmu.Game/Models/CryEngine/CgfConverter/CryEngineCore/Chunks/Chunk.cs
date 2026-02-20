@@ -124,11 +124,13 @@ public abstract class Chunk : IBinaryChunk
         if (reader is null)
             return;
 
+        /*
         if ((reader.BaseStream.Position > Offset + Size) && (Size > 0))
             Utilities.Log(LogLevelEnum.Debug, "Buffer Overflow in {2} 0x{0:X} ({1} bytes)", ID, reader.BaseStream.Position - Offset - Size, GetType().Name);
 
         if (reader.BaseStream.Length < Offset + Size)
             Utilities.Log(LogLevelEnum.Debug, "Corrupt Headers in {1} 0x{0:X}", ID, GetType().Name);
+        */
 
         if (!bytesToSkip.HasValue)
             bytesToSkip = (long)(Size - Math.Max(reader.BaseStream.Position - Offset, 0));

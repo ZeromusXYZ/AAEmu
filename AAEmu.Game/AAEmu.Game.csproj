@@ -95,6 +95,7 @@
     <PackageReference Include="NLog" />
     <PackageReference Include="NLua" />
     <PackageReference Include="OSVersionExt.NetStd" />
+    <PackageReference Include="Pfim" />
     <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="System.IO.Hashing" />
   </ItemGroup>

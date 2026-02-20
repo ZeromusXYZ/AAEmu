@@ -30,6 +30,9 @@ public class WorldCell
     public Hmap LoadedHmap { get; private set; }
     public ObjectsFile LoadedObjectDat { get; set; }
     public VisAreasFile LoadedVisAreasDat { get; set; }
+    public MaterialsFile MaterialFiles { get; set; }
+    public MaterialsListFile MaterialListFiles { get; set; }
+    public MaterialsFile StatObjsFiles { get; set; }
 
     /// <summary>
     /// Bai files data to use in this cell
@@ -40,6 +43,8 @@ public class WorldCell
     /// Bounding box for use in Jitter
     /// </summary>
     public JBoundingBox BoundingBox { get; private set; }
+
+    public string CellFolder => Path.Combine("game", "worlds", Template.Name, "cells", $"{CellX:000}_{CellY:000}");
 
     public WorldCell(int cellX, int cellY, WorldTemplate template)
     {
@@ -267,8 +272,7 @@ public class WorldCell
     /// <exception cref="NotSupportedException"></exception>
     private bool LoadCellDataFromClient()
     {
-        var cellFileName = $"{CellX:000}_{CellY:000}";
-        var cellFolder =Path.Combine("game", "worlds", Template.Name, "cells", cellFileName);
+        var cellFolder = CellFolder;
         var heightMapFile = Path.Combine(cellFolder, "client", "terrain", "heightmap.dat");
         if (!ClientFileManager.FileExists(heightMapFile))
         {
@@ -340,6 +344,31 @@ public class WorldCell
             new JVector(CellOffset.X, MinHeight, CellOffset.Y), 
             new JVector(CellOffset.X + WorldManager.CELL_SIZE, MaxHeight, CellOffset.Y + WorldManager.CELL_SIZE)
         );
+        
+        // Load Materials data
+        var materialListFile = Path.Combine(cellFolder, "client", "material_list.dat");
+        if (ClientFileManager.FileExists(materialListFile))
+        {
+            var materialList = new MaterialsListFile(materialListFile);
+            materialList.ReadFile();
+            MaterialListFiles = materialList;
+        }
+
+        var materialFile = Path.Combine(cellFolder, "client", "materials.dat");
+        if (ClientFileManager.FileExists(materialFile))
+        {
+            var materials = new MaterialsFile(materialFile);
+            materials.ReadFile();
+            MaterialFiles = materials;
+        }
+
+        var statObjFile = Path.Combine(cellFolder, "client", "statobjs.dat");
+        if (ClientFileManager.FileExists(statObjFile))
+        {
+            var statObjs = new MaterialsFile(statObjFile);
+            statObjs.ReadFile();
+            StatObjsFiles = statObjs;
+        }
 
         // Load object.dat file
         var objectDatFile = Path.Combine(cellFolder, "client", "object.dat");
@@ -383,8 +412,11 @@ public class WorldCell
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
             // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
             worldInstance.Water.AddFromCellData(this);
-            worldInstance.Physics?.AddVoxelTerrain(this);
-            worldInstance.Physics?.ReAlignLoadedBaiNodePoints(this);
+            // Add voxel terrain
+            worldInstance.Physics?.AddStaticTerrainVoxels(this);
+            // Add the remaining brush objects async
+            worldInstance.QueueTerrainObjectsLoading(this);
+            // worldInstance.Physics?.ReAlignLoadedBaiNodePoints(this);
         }
         
 #if EXPORT_CELL_ON_LOAD

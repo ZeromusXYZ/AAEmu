@@ -33,7 +33,7 @@ public class ObjectDataType6Voxel() : ObjectDataBase(6)
     public byte[] MaterialNamesData { get; set; } = new byte[2048]; // 2048 bytes
     public byte[] ProcessedChunk2 { get; set; } = new byte[131072]; // 131072 bytes
 
-    public Matrix3x4 ModelTransformMatrix { get; set; }
+    public Matrix3x4 Matrix3X4 { get; set; }
     public int ModelNumLods { get; set; }
 
     // Data
@@ -124,7 +124,7 @@ public class ObjectDataType6Voxel() : ObjectDataBase(6)
             MaterialNamesData = Data.Skip(currentOffset).Take(2048).ToArray(); currentOffset += 2048;
             ProcessedChunk2 = Data.Skip(currentOffset).Take(131072).ToArray(); currentOffset += 131072;
 
-            ModelTransformMatrix = GetMatrix3X4(Data, currentOffset); currentOffset += 48;
+            Matrix3X4 = GetMatrix3X4(Data, currentOffset); currentOffset += 48;
             ModelNumLods = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;
 
             LodCompressedSize = BitConverter.ToInt32(Data, currentOffset); currentOffset += 4;

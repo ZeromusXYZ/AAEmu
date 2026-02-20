@@ -360,6 +360,8 @@ public class WorldManager(
         }
         #endregion
 
+        
+        TickManager.Instance.OnTick.Subscribe(LoadingInfoTick, TimeSpan.FromSeconds(30), true);
         _loaded = true;
 
         LoadHeightmaps();
@@ -1237,5 +1239,16 @@ public class WorldManager(
     public List<WorldInstance> GetWorldsByTemplate(uint templateId)
     {
         return _worlds.Values.Where(w => w.Template.Id == templateId).ToList();
+    }
+
+    private void LoadingInfoTick(TimeSpan delta)
+    {
+        foreach (var worldInstance in _worlds.Values)
+        {
+            if (worldInstance.WorldCellTerrainLoadingTask != null)
+            {
+                Logger.Debug($"{worldInstance} is busy loading objects of {worldInstance.WorldCellTerrainQueue.Count} cell(s). ({GameService.TimeSinceStart} since server start)");
+            }
+        }
     }
 }

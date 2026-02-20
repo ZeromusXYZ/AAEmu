@@ -168,6 +168,9 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     private readonly ConcurrentDictionary<uint, Character> _characters = new();
     #endregion GameObjectLists
 
+    public ConcurrentQueue<WorldCell> WorldCellTerrainQueue { get; init; }= new();
+    public Task WorldCellTerrainLoadingTask { get; private set; }
+    
     ~WorldInstance()
     {
         CleanupInstance();
@@ -916,5 +919,35 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
 
         // Logger.Debug($"Total ray checks: {testCount} ({validCount} hits)");
         return validCount > 0 ? totalHeight / validCount : 0f;
+    }
+
+    public void QueueTerrainObjectsLoading(WorldCell worldCell)
+    {
+        WorldCellTerrainQueue.Enqueue(worldCell);
+        // Create a new loading task if none active
+        if (WorldCellTerrainLoadingTask == null)
+        {
+            Logger.Debug($"Started new TerrainLoading Queue");
+            WorldCellTerrainLoadingTask = Task.Run(DoTerrainLoadingQueue);
+        }
+    }
+
+    private void DoTerrainLoadingQueue()
+    {
+        var cellsLoaded = 0;
+        while (WorldCellTerrainQueue.Count > 0)
+        {
+            if (WorldCellTerrainQueue.TryDequeue(out var cell))
+            {
+                Physics?.AddStaticTerrainObjects(cell);
+                cellsLoaded++;
+            }
+            else
+            {
+                Logger.Warn("Failed to retrieve cell for terrain objects loading queue.");
+            }
+        }
+        WorldCellTerrainLoadingTask = null;
+        Logger.Debug($"Finished TerrainLoading Queue of {cellsLoaded} cells. ({GameService.TimeSinceStart} since server start)");
     }
 }
