@@ -15,6 +15,7 @@
         "GeoDataMode": true,
         "PreLoadTerrain": false,
         "LoadBrushModels": true,
+        "LoadBrushMinimumSize": 15.0,
         "MaxInstances": 32,
         "TargetPhysicsTps": 25.0,
         "ActabilityRate": 1.0

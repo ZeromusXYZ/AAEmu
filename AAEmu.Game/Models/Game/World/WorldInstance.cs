@@ -278,17 +278,25 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         // refPos to us as a starting point to find surface, we put this 2m higher that requested location
         // to take into account possible model clipping
         var refPos = pos with { Z = pos.Z + RayCastStartZOffset };
+        var traceOrigin = refPos.ToJVector();
         var hMapRes = 0f;
         var voxelRes = 0f;
         var voxelDist = float.PositiveInfinity;
+        var brushRes = 0f;
+        var brushDist = float.PositiveInfinity;
         var traceDirection = -JVector.UnitY;
         var hitResultList = new List<float>(4) { 0f }; // should be max 4 entries with the current detection system
+        var roughCheckSize = new JVector(256f, 256f, 256f);
+        var roughPosArea = new JBoundingBox(pos -  roughCheckSize, pos + roughCheckSize);
         // First try using physics engine
         if (Physics is { WorldHeightMapTester: not null })
         {
             // Check voxel floor collision
             foreach ( var voxel in Physics.VoxelObjects.ToArray())
             {
+                if (!JBoundingBoxContains2DPoint(roughPosArea, voxel.Position.X, voxel.Position.Y))
+                    continue;
+
                 foreach (var voxelShape in voxel.Shapes)
                 {
                     // TODO: There seems to be some issue with the voxel dimensions and/or position
@@ -296,7 +304,6 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
                     if (!JBoundingBoxContains2DPoint(voxelShape.WorldBoundingBox, refPos.X, refPos.Y))
                         continue;
 
-                    var traceOrigin = refPos.ToJVector();
                     if (voxelShape.RayCast(traceOrigin, traceDirection, out var normal, out var lambda))
                     {
                         var targetHeightJPos = traceOrigin + lambda * traceDirection;
@@ -310,7 +317,6 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
                     }
                 }
             }
-
             // If it hit a voxel, we can assume this is the valid solution
             if (voxelRes > 0)
             {
@@ -318,6 +324,38 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
                 // return voxelRes;
             }
 
+            // Check if hitting static level objects (buildings and ramps)
+            foreach ( var brush in Physics.BrushObjects.ToArray())
+            {
+                if (!JBoundingBoxContains2DPoint(roughPosArea, brush.Position.X, brush.Position.Y))
+                    continue;
+
+                foreach (var brushShape in brush.Shapes)
+                {
+                    // TODO: There seems to be some issue with the voxel dimensions and/or position
+                    // Logger.Info($"Voxel Pos {voxel.Position}, Box {voxelShape.WorldBoundingBox}");
+                    if (!JBoundingBoxContains2DPoint(brushShape.WorldBoundingBox, refPos.X, refPos.Y))
+                        continue;
+
+                    if (brushShape.RayCast(traceOrigin, traceDirection, out var normal, out var lambda))
+                    {
+                        var targetHeightJPos = traceOrigin + lambda * traceDirection;
+                        // Check if closer AND below reference height
+                        if (lambda < brushDist && targetHeightJPos.Y <= refPos.Z)
+                        {
+                            brushRes = targetHeightJPos.Y;
+                            brushDist = lambda;
+                        }
+                        // TODO: Maybe add all possible hits to the list?
+                    }
+                }
+            }
+            // If we hit a brush, add that
+            if (brushRes > 0f)
+            {
+                hitResultList.Add(brushRes);
+            }
+            
             // Get from Heightmap tester only
             hMapRes = GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
             if (hMapRes > 0)

@@ -85,7 +85,12 @@ public class WorldConfig
     /// <summary>
     /// Enable the loading of level model geometry to have more accurate collision for AI and Skills
     /// </summary>
-    public bool LoadBrushModels { get; set; } 
+    public bool LoadBrushModels { get; set; }
+
+    /// <summary>
+    /// If not zero, will only load brush models that result in a hitbox size larger than or equal to this size (diagonal)
+    /// </summary>
+    public float LoadBrushMinimumSize { get; set; } = 0f;
 
     /// <summary>
     /// Maximum number of instances that can be created (includes system instances)

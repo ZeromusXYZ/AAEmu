@@ -82,7 +82,13 @@ public class PhysicsManager
     /// </summary>
     public void Initialize()
     {
-        PhysWorld = new Jitter2.World();
+        // Assume 8k items max / cell in the world
+        var cap = new Jitter2.World.Capacity()
+        {
+            BodyCount = 0x2000 * SimulationWorld.Template.CellX * SimulationWorld.Template.CellY,
+            ContactCount = 0x4000 * SimulationWorld.Template.CellX * SimulationWorld.Template.CellY,
+        };
+        PhysWorld = new Jitter2.World(cap);
         PhysWorld.Gravity = new JVector(0, -9.81f, 0);
 
         Buoyancy = new Buoyancy(PhysWorld)
@@ -234,7 +240,7 @@ public class PhysicsManager
                 if (SimulationWorld.WorldCellTerrainLoadingTask != null)
                 {
                     // Skip physics if loading data
-                    continue;
+                    // continue;
                 }
                 
                 List<(RigidBody body, JVector vel, bool moving)> snapshot = [];
@@ -841,6 +847,9 @@ public class PhysicsManager
     {
         if (worldCell == null)
             return;
+        // Only load if enabled
+        if (!AppConfiguration.Instance.World.LoadBrushModels)
+            return;
 
         // Main objects list
         var objectsLoadedCount = 0;
@@ -883,6 +892,13 @@ public class PhysicsManager
     /// <param name="brush"></param>
     private bool AddBrushObject(WorldCell cell, ObjectDataType1Brush brush)
     {
+        var roughSize = Vector3.Distance(brush.StartPos, brush.EndPos);
+        // var roughSize = MathUtil.CalculateDistance(brush.StartPos, brush.EndPos, false);
+        if (AppConfiguration.Instance.World.LoadBrushMinimumSize > 0f && roughSize < AppConfiguration.Instance.World.LoadBrushMinimumSize)
+        {
+            // Too small to bother loading (if configured)
+            return false;
+        }
         var timer = new Stopwatch();
         timer.Start();
         var cellOffset = cell.GetCellWorldOffset().ToJVector();
@@ -951,7 +967,8 @@ public class PhysicsManager
             brushObject = PhysWorld.CreateRigidBody();
             brushObject.Tag = brush;
             brushObject.AffectedByGravity = false;
-            brushObject.Position = new JVector(brush.Matrix3X4.M14, brush.Matrix3X4.M34, brush.Matrix3X4.M24);
+            brushObject.IsStatic = true;
+            brushObject.Position = cellOffset + new JVector(brush.Matrix3X4.M14, brush.Matrix3X4.M34, brush.Matrix3X4.M24);
 
             // Add the new shapes
             foreach (var rigidBodyShape in shapesToAdd)
@@ -960,11 +977,11 @@ public class PhysicsManager
             }
 
             // Apply Cell offset after transform
-            brushObject.Position += cellOffset;
+            // brushObject.Position += cellOffset;
 
             // Mark the floor as static
             brushObject.IsStatic = true;
-            brushObject.SetActivationState(true);
+            // brushObject.SetActivationState(true);
             EnqueueAddBody(brushObject);
 
             // Add to reference list
