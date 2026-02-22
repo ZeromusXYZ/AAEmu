@@ -24,6 +24,7 @@ public class ObjectDataBase(int prefabType)
         {27, 652}, // 
     };
 
+    public string Name { get; set; }
     public int PrefabType { get; init; } = prefabType;
     public virtual bool IsGeneric { get; protected init; } = true;
     public byte[] Data { get; set; } = [];

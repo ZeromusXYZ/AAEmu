@@ -187,6 +187,7 @@ public class ObjectsFile(string fileName)
                 break;
             var objectType = BitConverter.ToInt32(blockData, offset);
             var prefab = GetPrefabReader(objectType);
+            prefab.Name = $"{objectType}-{PrefabsList.Count}@{FileName}";
             var totalObjectSize = prefab.ReadData(blockData, startOfObjectOffset);
             if (totalObjectSize > 0)
             {

@@ -225,9 +225,14 @@ public class PhysicsManager
                 else if (timeToNextStep.TotalMilliseconds < -TargetPhysicsTps)
                 {
                     // If it's taking more than double the expected time, toss a warning if not loading terrain objects
-                    if (SimulationWorld.WorldCellTerrainLoadingTask == null || timeToNextStep.TotalMilliseconds < (TargetPhysicsTps * -10f))
+                    if (SimulationWorld.WorldCellTerrainLoadingTask == null)
                     {
-                        Logger.Warn($"Physics thread is running slow in {SimulationWorld} at {timeSinceLastTick.TotalMilliseconds:F1} / {targetStepTime.TotalMilliseconds:F1} ms ({PhysWorld.RigidBodies.Count} RigidBodies)");
+                        Logger.Warn($"Physics thread is running slow in {SimulationWorld} at {timeSinceLastTick.TotalMilliseconds:F1} / {targetStepTime.TotalMilliseconds:F1} ms ({PhysWorld.RigidBodies.Count} RigidBodies)");                        
+                    }
+                    // If it's still loading, only toss a DEBUG warning if it's taking at least 10 times long than a normal tick
+                    else if (timeToNextStep.TotalMilliseconds < (TargetPhysicsTps * -9f))
+                    {
+                        Logger.Debug($"Physics thread is running slow in {SimulationWorld} at {timeSinceLastTick.TotalMilliseconds:F1} / {targetStepTime.TotalMilliseconds:F1} ms ({PhysWorld.RigidBodies.Count} RigidBodies)");
                     }
                 }
 
@@ -952,6 +957,7 @@ public class PhysicsManager
         for (var i = 0; i < brushMesh.Indices.Length - 2; i++)
         {
             var voxelShape = new TriangleShape(brushMesh, i);
+            
             // Apply transform before adding
             var m3X3 = new JMatrix(
                 brush.Matrix3X4.M11, brush.Matrix3X4.M31, brush.Matrix3X4.M21,
@@ -959,6 +965,8 @@ public class PhysicsManager
                 brush.Matrix3X4.M12, brush.Matrix3X4.M32, brush.Matrix3X4.M22);
             var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
             shapesToAdd.Add(transformedShape);
+            
+            // shapesToAdd.Add(voxelShape);
         }
 
         lock (_worldLock)
@@ -969,6 +977,13 @@ public class PhysicsManager
             brushObject.AffectedByGravity = false;
             brushObject.IsStatic = true;
             brushObject.Position = cellOffset + new JVector(brush.Matrix3X4.M14, brush.Matrix3X4.M34, brush.Matrix3X4.M24);
+            /*
+            var m3X3 = new JMatrix(
+                brush.Matrix3X4.M11, brush.Matrix3X4.M31, brush.Matrix3X4.M21,
+                brush.Matrix3X4.M13, brush.Matrix3X4.M33, brush.Matrix3X4.M23,
+                brush.Matrix3X4.M12, brush.Matrix3X4.M32, brush.Matrix3X4.M22);
+            brushObject.Orientation = JQuaternion.CreateFromMatrix(m3X3);
+            */
 
             // Add the new shapes
             foreach (var rigidBodyShape in shapesToAdd)
@@ -1040,29 +1055,36 @@ public class PhysicsManager
         // Load triangles into a mesh
         var voxelMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
         // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
-        for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
+        lock (_worldLock)
         {
-            var voxelShape = new TriangleShape(voxelMesh, i);
-            // Apply transform before adding
+            for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
+            {
+                var voxelShape = new TriangleShape(voxelMesh, i);
+                
+                // Apply transform before adding
+                var m3X3 = new JMatrix(
+                    voxel.Matrix3X4.M11, voxel.Matrix3X4.M31, voxel.Matrix3X4.M21,
+                    voxel.Matrix3X4.M13, voxel.Matrix3X4.M33, voxel.Matrix3X4.M23,
+                    voxel.Matrix3X4.M12, voxel.Matrix3X4.M32, voxel.Matrix3X4.M22);
+                var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+                    voxelObject.AddShape(transformedShape, false); // Has no mass
+                
+                voxelObject.AddShape(voxelShape, false);
+            }
+
+            // Apply Cell offset after transform
+            voxelObject.Position += cellOffset;
+            /*
             var m3X3 = new JMatrix(
                 voxel.Matrix3X4.M11, voxel.Matrix3X4.M31, voxel.Matrix3X4.M21,
                 voxel.Matrix3X4.M13, voxel.Matrix3X4.M33, voxel.Matrix3X4.M23,
                 voxel.Matrix3X4.M12, voxel.Matrix3X4.M32, voxel.Matrix3X4.M22);
-            var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
-            lock (_worldLock)
-            {
-                voxelObject.AddShape(transformedShape, false); // Has no mass
-            }
-        }
-
-        lock (_worldLock)
-        {
-            // Apply Cell offset after transform
-            voxelObject.Position += cellOffset;
+            voxelObject.Orientation = JQuaternion.CreateFromMatrix(m3X3);
+            */
 
             // Mark the floor as static
             voxelObject.IsStatic = true;
-            voxelObject.SetActivationState(true);
+            // voxelObject.SetActivationState(true);
             EnqueueAddBody(voxelObject);
 
             // Add to reference list

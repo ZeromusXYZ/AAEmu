@@ -4,6 +4,7 @@ using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.Core.Managers.UnitManagers;
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Models.Game.DoodadObj;
@@ -11,6 +12,8 @@ using AAEmu.Game.Models.Game.World;
 using AAEmu.Game.Utils;
 using AAEmu.Game.Utils.Scripts;
 using Jitter2.Collision;
+using Jitter2.Collision.Shapes;
+using Jitter2.Dynamics;
 using Jitter2.LinearMath;
 using NLog.Targets;
 
@@ -51,12 +54,13 @@ public class TestHeight : ICommand
                "Adding a GEO argument at the end will use data from the bail files instead of the heightmap.dat file.";
     }
 
-    private float ScriptGetHeight(Vector3 pos, WorldInstance world, TestHeightMode mode)
+    private float ScriptGetHeight(Vector3 pos, WorldInstance world, TestHeightMode mode, out RigidBody hitObject)
     {
+        hitObject = null;
         switch (mode)
         {
             case TestHeightMode.System:
-                return world.GetHeight(pos);
+                return world.GetHeight(pos, out hitObject);
             case TestHeightMode.HeightMap:
                 return world.GetHeightUsingHeightMapDat(pos.X, pos.Y);
             case TestHeightMode.BaiData:
@@ -172,7 +176,7 @@ public class TestHeight : ICommand
                 doodadSpawner.Position = character.Transform.CloneAsSpawnPosition();
                 doodadSpawner.Position.X = x;
                 doodadSpawner.Position.Y = y;
-                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode);
+                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode, out _);
                 doodadSpawner.Position.Yaw = 0;
                 doodadSpawner.Position.Pitch = 0;
                 doodadSpawner.Position.Roll = 0;
@@ -204,7 +208,7 @@ public class TestHeight : ICommand
                 doodadSpawner.Position = character.Transform.CloneAsSpawnPosition();
                 doodadSpawner.Position.X = x + 0.01f;
                 doodadSpawner.Position.Y = rY + 0.01f;
-                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode);
+                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode, out _);
                 doodadSpawner.Position.Yaw = 0;
                 doodadSpawner.Position.Pitch = 0;
                 doodadSpawner.Position.Roll = 0;
@@ -224,7 +228,7 @@ public class TestHeight : ICommand
                 };
                 doodadSpawner.Position.X = rX;
                 doodadSpawner.Position.Y = y;
-                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode);
+                doodadSpawner.Position.Z = ScriptGetHeight(doodadSpawner.Position.AsPositionVector(), doodadSpawner.ParentWorld, heightMode, out _);
                 doodadSpawner.Position.Yaw = 0;
                 doodadSpawner.Position.Pitch = 0;
                 doodadSpawner.Position.Roll = 0;
@@ -246,7 +250,7 @@ public class TestHeight : ICommand
             for (var x = rX - 100; x <= rX + 100; x += 2)
             {
                 var testPos = character.Transform.World.Position + new Vector3(x, y, 0);
-                var h = ScriptGetHeight(testPos, character.ParentWorld, heightMode);
+                var h = ScriptGetHeight(testPos, character.ParentWorld, heightMode, out _);
                 totalHeight += h;
             }
             sw.Stop();
@@ -254,14 +258,28 @@ public class TestHeight : ICommand
         }
         else
         {
+            var doExport = (args.Length > firstarg && args[firstarg].ToLower() == "export");
             // Show info
             var world = WorldManager.Instance.GetWorldTemplateByZoneKey(targetPlayer.Transform.ZoneId);
 
-            var height = ScriptGetHeight(targetPlayer.Transform.World.Position, targetPlayer.ParentWorld, heightMode);
+            var height = ScriptGetHeight(targetPlayer.Transform.World.Position, targetPlayer.ParentWorld, heightMode, out var hitTarget);
             // var height = world.GetHeight(targetPlayer.Transform.World.Position.X, targetPlayer.Transform.World.Position.Y);
             var hDelta = character.Transform.World.Position.Z - height;
             CommandManager.SendNormalText(this, messageOutput, $"{targetPlayer.Name} Z-Pos: {character.Transform.World.Position.Z} - Floor: {height} (mode:{heightMode}) - HeightmapDelta: {hDelta}");
             CommandManager.SendNormalText(this, messageOutput, $"|cFFFFFFFF{targetPlayer.Name}|r X: |cFFFFFFFF{targetPlayer.Transform.World.Position.X:F1}|r  Y: |cFFFFFFFF{targetPlayer.Transform.World.Position.Y:F1}|r  Z: |cFFFFFFFF{targetPlayer.Transform.World.Position.Z:F1}|r ");
+            if (hitTarget?.Tag is ObjectDataType1Brush brush)
+            {
+                CommandManager.SendNormalText(this, messageOutput, $"Hit brush object |cFFFFFFFF{brush.Name}|r");
+            }
+
+            if (hitTarget?.Tag is ObjectDataType6Voxel voxel)
+            {
+                CommandManager.SendNormalText(this, messageOutput, $"Hit voxel terrain |cFFFFFFFF{voxel.Name}|r");
+                if (doExport)
+                {
+                    voxel.ExportData("C:\\Temp\\TestHeightVoxelExport.obj");
+                }
+            }
 
             var borderLeft = (int)Math.Floor(targetPlayer.Transform.World.Position.X);
             borderLeft = borderLeft - borderLeft % 2;

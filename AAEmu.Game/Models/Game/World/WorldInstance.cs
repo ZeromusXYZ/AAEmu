@@ -4,6 +4,7 @@ using AAEmu.Commons.IO;
 using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Managers.Id;
 using AAEmu.Game.Core.Managers.World;
+using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.AI.v2.Behaviors.Common;
 using AAEmu.Game.Models.Game.AI.v2.Framework;
 using AAEmu.Game.Models.Game.Char;
@@ -13,6 +14,7 @@ using AAEmu.Game.Models.Game.Indun;
 using AAEmu.Game.Models.Game.NPChar;
 using AAEmu.Game.Models.Game.Units;
 using AAEmu.Game.Utils;
+using Jitter2.Dynamics;
 using Jitter2.LinearMath;
 using NLog;
 
@@ -270,9 +272,11 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
     /// Gets height at target position using various methods (recommended way to get solid surface height)
     /// </summary>
     /// <param name="pos"></param>
+    /// <param name="hitTarget">Returns the RigidBody of the object that was hit as a result of the height check raycast</param>
     /// <returns></returns>
-    public float GetHeight(Vector3 pos)
+    public float GetHeight(Vector3 pos, out RigidBody hitTarget)
     {
+        hitTarget = null;
         const float GeoCheckMaxDistance = 3f;
         const float RayCastStartZOffset = 2f;
         // refPos to us as a starting point to find surface, we put this 2m higher that requested location
@@ -285,12 +289,13 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         var brushRes = 0f;
         var brushDist = float.PositiveInfinity;
         var traceDirection = -JVector.UnitY;
-        var hitResultList = new List<float>(4) { 0f }; // should be max 4 entries with the current detection system
+        var hitResultList = new List<(float, RigidBody)>(4) { (0f, null) }; // should be max 4 entries with the current detection system
         var roughCheckSize = new JVector(256f, 256f, 256f);
         var roughPosArea = new JBoundingBox(pos -  roughCheckSize, pos + roughCheckSize);
         // First try using physics engine
         if (Physics is { WorldHeightMapTester: not null })
         {
+            RigidBody voxelHit = null;
             // Check voxel floor collision
             foreach ( var voxel in Physics.VoxelObjects.ToArray())
             {
@@ -312,6 +317,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
                         {
                             voxelRes = targetHeightJPos.Y;
                             voxelDist = lambda;
+                            voxelHit = voxel;
                         }
                         // TODO: Maybe add all possible hits to the list?
                     }
@@ -320,10 +326,11 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
             // If it hit a voxel, we can assume this is the valid solution
             if (voxelRes > 0)
             {
-                hitResultList.Add(voxelRes);
+                hitResultList.Add((voxelRes, voxelHit));
                 // return voxelRes;
             }
 
+            RigidBody brushHit = null;
             // Check if hitting static level objects (buildings and ramps)
             foreach ( var brush in Physics.BrushObjects.ToArray())
             {
@@ -345,6 +352,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
                         {
                             brushRes = targetHeightJPos.Y;
                             brushDist = lambda;
+                            brushHit = brush;
                         }
                         // TODO: Maybe add all possible hits to the list?
                     }
@@ -353,14 +361,14 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
             // If we hit a brush, add that
             if (brushRes > 0f)
             {
-                hitResultList.Add(brushRes);
+                hitResultList.Add((brushRes, brushHit));
             }
             
             // Get from Heightmap tester only
             hMapRes = GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
             if (hMapRes > 0)
             {
-                hitResultList.Add(hMapRes);
+                hitResultList.Add((hMapRes, null));
             }
         }
 
@@ -374,29 +382,38 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         }
         */
 
-        hitResultList.Add(float.PositiveInfinity);
+        hitResultList.Add((float.PositiveInfinity, null));
         hitResultList.Sort();
 
         // Find the lowest possible result
         var hitRes = hitResultList[0];
         for (var i = 1; i < hitResultList.Count; i++)
         {
-            if (hitResultList[i] >= refPos.Z && hitResultList[i - 1] < refPos.Z)
+            if (hitResultList[i].Item1 >= refPos.Z && hitResultList[i - 1].Item1 < refPos.Z)
             {
                 hitRes = hitResultList[i - 1];
                 break;
             }
         }
 
-        if (hitRes > 0f)
+        if (hitRes.Item1 > 0f)
         {
-            return hitRes;
+            hitTarget = hitRes.Item2;
+            return hitRes.Item1;
         }
         
         // Fallback to the old heightmap.dat data method (this mostly happens when world terrain hasn't been loaded yet) 
         hMapRes = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
         return hMapRes;
     }
+
+    /// <summary>
+    /// Gets height at target position using various methods (recommended way to get solid surface height)
+    /// Calls the main GetHeight(pos, hitTarget) and discards the hitTarget
+    /// </summary>
+    /// <param name="pos"></param>
+    /// <returns></returns>
+    public float GetHeight(Vector3 pos) => GetHeight(pos, out _);
 
     public float GetReferenceHeight(NpcAi ai, Vector3 pos, uint zoneId)
     {
@@ -986,6 +1003,6 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
             }
         }
         WorldCellTerrainLoadingTask = null;
-        Logger.Debug($"Finished TerrainLoading Queue of {cellsLoaded} cells. ({GameService.TimeSinceStart} since server start)");
+        Logger.Info($"Finished TerrainLoading Queue of {cellsLoaded} cells. ({GameService.TimeSinceStart} since server start)");
     }
 }

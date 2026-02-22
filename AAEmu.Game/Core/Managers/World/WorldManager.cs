@@ -1247,7 +1247,7 @@ public class WorldManager(
         {
             if (worldInstance.WorldCellTerrainLoadingTask != null)
             {
-                Logger.Debug($"{worldInstance} is busy loading objects of {worldInstance.WorldCellTerrainQueue.Count} cell(s). ({GameService.TimeSinceStart} since server start)");
+                Logger.Debug($"{worldInstance} is busy loading objects of {worldInstance.WorldCellTerrainQueue.Count+1} cell(s). ({GameService.TimeSinceStart} since server start)");
             }
         }
     }
