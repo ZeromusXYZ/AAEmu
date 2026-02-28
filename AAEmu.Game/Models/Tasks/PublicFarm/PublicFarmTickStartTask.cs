@@ -2,10 +2,10 @@
 
 namespace AAEmu.Game.Models.Tasks.PublicFarm;
 
-public class PublicFarmTickStartTask : Task
+public class PublicFarmTickStartTask(PublicFarmManager farmManager) : Task
 {
     public override void Execute()
     {
-        PublicFarmManager.PublicFarmTick();
+        farmManager?.PublicFarmTick();
     }
 }

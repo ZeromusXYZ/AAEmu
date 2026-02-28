@@ -29,11 +29,11 @@ public class PublicFarmManager(ITaskManager taskManager, IWorldManager worldMana
     {
         Logger.Info("PublicFarmTickTask: Started");
 
-        var lpTickStartTask = new PublicFarmTickStartTask();
+        var lpTickStartTask = new PublicFarmTickStartTask(this);
         taskManager.Schedule(lpTickStartTask, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
-    public static void PublicFarmTick()
+    public void PublicFarmTick()
     {
         // NOTE: Public farms only available in main_world
         var world = worldManager.GetWorld(WorldManager.DefaultInstanceId);

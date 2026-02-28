@@ -111,7 +111,8 @@ public class WorldCell
                 var pathBaiLoader = new BaseBaiLoader(Template);
                 pathBaiLoader.LoadBaiFilesFromFolder(pathFolder); // (x != 0 || y != 0)
                 BaiLoader[x, y] = pathBaiLoader;
-                Template.PathBaiLoader.Add((pathX, pathY), pathBaiLoader);
+                if (!Template.PathBaiLoader.TryAdd((pathX, pathY), pathBaiLoader))
+                    Logger.Warn($"Failed to add BaiLoader (path) to {pathFolder}");
                 // TODO: Temporary disabled fake nodes until re-implemented
                 // GenerateFakeIntermediateNodes(pathBaiLoader, baiOffset, pathX, pathY);
             }
@@ -253,14 +254,12 @@ public class WorldCell
 
         lock (_loadLock)
         {
-            Loading = true;
             // Assign heightmap array
             HeightMap = new float[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
             MaterialsMap = new byte[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
             // Load data
             LoadBaiFiles();
             Loaded = LoadCellDataFromClient();
-            Loading = false;
         }
         return this;
     }

@@ -982,7 +982,7 @@ public class WorldInstance(WorldTemplate template, uint channelId, bool dontFree
         // Create a new loading task if none active
         if (WorldCellTerrainLoadingTask == null)
         {
-            Logger.Debug($"Started new TerrainLoading Queue");
+            Logger.Debug($"Started new TerrainLoading Queue for loading Cell {worldCell}");
             WorldCellTerrainLoadingTask = Task.Run(DoTerrainLoadingQueue);
         }
     }
