@@ -196,7 +196,7 @@ public class PathNode
         }
 
         // Find the nearest node
-        var nearestNode = bai.FindClosestNetMissionNode(pathNode.CurrentTargetPos);
+        var nearestNode = bai.FindClosestNetMissionNode(pathNode.CurrentTargetPos, 0);
         if (nearestNode == null)
         {
             // Was not able to find a nearby node

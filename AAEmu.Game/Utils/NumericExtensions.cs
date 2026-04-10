@@ -108,4 +108,20 @@ public static class NumericExtensions
     {
         return (pos.X - (float)Math.Floor(pos.X / 256f), pos.Y - (float)Math.Floor(pos.Y / 256f));
     }
+
+    /// <summary>
+    /// Gets the length of the Vector3 ignoring the Z axis
+    /// </summary>
+    public static float Length2D(this Vector3 val)
+    {
+        return new Vector2(val.X, val.Y).Length();
+    }
+
+    /// <summary>
+    /// Gets the length of the JVector ignoring the Y axis
+    /// </summary>
+    public static float Length2D(this JVector val)
+    {
+        return new Vector2(val.X, val.Z).Length();
+    }
 }
