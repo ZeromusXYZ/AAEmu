@@ -7,6 +7,7 @@ using AAEmu.Game.Models.CryEngine.Loaders;
 using AAEmu.Game.Models.Game.World.Transform;
 using AAEmu.Game.Models.Game.World.Xml;
 using AAEmu.Game.Models.Game.World.Zones;
+using AAEmu.Game.Physics.HeightMaps;
 using AAEmu.Game.Utils;
 using NLog;
 
@@ -108,6 +109,11 @@ public class WorldTemplate
     /// (PathX, PathY), BaiLoader
     /// </summary>
     public ConcurrentDictionary<(uint, uint), BaseBaiLoader> PathBaiLoader { get; init; } = new();
+
+    /// <summary>
+    ///  Heightmap data used by the physics engine
+    /// </summary>
+    public Heightmap PhysicsHeightMap { get; set; }
 
     /// <summary>
     /// Gets heightmap height at target position (not smoothened)
@@ -244,5 +250,42 @@ public class WorldTemplate
         // Return value from the main paths dictionary
         var pathsPos = pos.ToPathsIndex();
         return PathBaiLoader.GetValueOrDefault(((uint)pathsPos.Item1, (uint)pathsPos.Item2));
+    }
+
+    /// <summary>
+    /// Gets heightmap height at target position (not smoothened)
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public float GetHeightMapHeight(int x, int y)
+    {
+        var cellX = x / WorldManager.CELL_SIZE;
+        var cellY = y / WorldManager.CELL_SIZE;
+        if (cellX < 0 || cellX > CellX || cellY < 0 || cellY > CellY)
+            return 0f; // out of bounds
+        var cell = Cells[cellX, cellY].VerifyCellLoaded();
+        var sx = (x % WorldManager.CELL_SIZE) / 2;
+        var sy = (y % WorldManager.CELL_SIZE) / 2;
+        return cell.HeightMap[sx, sy];
+    }
+
+    /// <summary>
+    /// Gets the material data at target position
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public float GetHeightMapMaterial(int x, int y)
+    {
+        var cellX = x / WorldManager.CELL_SIZE;
+        var cellY = y / WorldManager.CELL_SIZE;
+        if (cellX < 0 || cellX > CellX || cellY < 0 || cellY > CellY)
+            return 0f; // out of bounds
+        var cell = Cells[cellX, cellY].VerifyCellLoaded();
+        var sx = (x % WorldManager.CELL_SIZE) / 2;
+        var sy = (y % WorldManager.CELL_SIZE) / 2;
+        // return cell.MaterialsMap[sx, sy];
+        return cell.GetMaterialsDataInCell(sx, sy);
     }
 }

@@ -8,10 +8,11 @@ using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Models.Game.DoodadObj;
 using AAEmu.Game.Models.Game.Gimmicks;
 using AAEmu.Game.Models.Game.Indun;
-using AAEmu.Game.Models;
 using AAEmu.Game.Models.Game.NPChar;
 using AAEmu.Game.Models.Game.Units;
-
+using AAEmu.Game.Utils;
+using Jitter2.Dynamics;
+using Jitter2.LinearMath;
 using NLog;
 
 namespace AAEmu.Game.Models.Game.World;
@@ -66,7 +67,7 @@ public partial class WorldInstance(WorldTemplate template, uint channelId, bool 
     /// <summary>
     /// Water definitions
     /// </summary>
-    public WaterBodies Water { get; set; }
+    public WaterBodies Water { get; set; } = new();
 
     /// <summary>
     /// BAI-derived ship collision polylines (non-null when <see cref="WorldConfig.GeoDataMode"/> was on at init).
@@ -180,6 +181,9 @@ public partial class WorldInstance(WorldTemplate template, uint channelId, bool 
     private readonly ConcurrentDictionary<uint, Character> _characters = new();
     #endregion GameObjectLists
 
+    public ConcurrentQueue<WorldCell> WorldCellTerrainQueue { get; init; } = new();
+    public Task WorldCellTerrainLoadingTask { get; private set; }
+
     ~WorldInstance()
     {
         CleanupInstance();
@@ -264,30 +268,170 @@ public partial class WorldInstance(WorldTemplate template, uint channelId, bool 
     }
 
     /// <summary>
-    /// Gets height at target position using interpolation
+    /// Checks if point x, y is within a JBoundingBox ignoring height
     /// </summary>
+    /// <param name="box"></param>
     /// <param name="x"></param>
     /// <param name="y"></param>
     /// <returns></returns>
-    public float GetHeight(float x, float y)
+    public static bool JBoundingBoxContains2DPoint(JBoundingBox box, float x, float y)
     {
-        // return GetRawHeightMapHeight((int)x, (int)y); // <-- the old way we used to do things
+        return (x >= box.Min.X && x <= box.Max.X && y >= box.Min.Z && y <= box.Max.Z);
+    }
+    
+    /// <summary>
+    /// Gets height at target position using various methods (recommended way to get solid surface height)
+    /// </summary>
+    /// <param name="pos"></param>
+    /// <param name="hitTarget">Returns the RigidBody of the object that was hit as a result of the height check raycast</param>
+    /// <returns></returns>
+    public float GetHeight(Vector3 pos, out RigidBody hitTarget)
+    {
+        hitTarget = null;
+        const float GeoCheckMaxDistance = 3f;
+        const float RayCastStartZOffset = 2f;
+        // refPos to us as a starting point to find surface, we put this 2m higher that requested location
+        // to take into account possible model clipping
+        var refPos = pos with { Z = pos.Z + RayCastStartZOffset };
+        var traceOrigin = refPos.ToJVector();
+        var hMapRes = 0f;
+        var voxelRes = 0f;
+        var voxelDist = float.PositiveInfinity;
+        var brushRes = 0f;
+        var brushDist = float.PositiveInfinity;
+        var traceDirection = -JVector.UnitY;
+        var hitResultList = new List<(float, RigidBody)>(4) { (0f, null) }; // should be max 4 entries with the current detection system
+        var roughCheckSize = new JVector(256f, 256f, 256f);
+        var roughPosArea = new JBoundingBox(pos -  roughCheckSize, pos + roughCheckSize);
+        // First try using physics engine
+        if (Physics is { WorldHeightMapTester: not null })
+        {
+            RigidBody voxelHit = null;
+            // Check voxel floor collision
+            foreach ( var voxel in Physics.VoxelObjects.ToArray())
+            {
+                if (!JBoundingBoxContains2DPoint(roughPosArea, voxel.Position.X, voxel.Position.Y))
+                    continue;
 
-        // Get bordering points
-        var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
+                foreach (var voxelShape in voxel.Shapes)
+                {
+                    // TODO: There seems to be some issue with the voxel dimensions and/or position
+                    // Logger.Info($"Voxel Pos {voxel.Position}, Box {voxelShape.WorldBoundingBox}");
+                    if (!JBoundingBoxContains2DPoint(voxelShape.WorldBoundingBox, refPos.X, refPos.Y))
+                        continue;
 
-        // Get heights for these points
-        var heightTl = Template.GetRawHeightMapHeight(border.Left, border.Top);
-        var heightTr = Template.GetRawHeightMapHeight(border.Right, border.Top);
-        var heightBl = Template.GetRawHeightMapHeight(border.Left, border.Bottom);
-        var heightBr = Template.GetRawHeightMapHeight(border.Right, border.Bottom);
-        var offX = (x - border.Left) / 2;
-        var offY = (y - border.Top) / 2;
-        var height = Blerp(heightTl, heightTr, heightBl, heightBr, offX, offY); // bilinear interpolation
+                    if (voxelShape.RayCast(traceOrigin, traceDirection, out var normal, out var lambda))
+                    {
+                        var targetHeightJPos = traceOrigin + lambda * traceDirection;
+                        // Check if closer AND below reference height
+                        if (lambda < voxelDist && targetHeightJPos.Y <= refPos.Z)
+                        {
+                            voxelRes = targetHeightJPos.Y;
+                            voxelDist = lambda;
+                            voxelHit = voxel;
+                        }
+                        // TODO: Maybe add all possible hits to the list?
+                    }
+                }
+            }
+            // If it hit a voxel, we can assume this is the valid solution
+            if (voxelRes > 0)
+            {
+                hitResultList.Add((voxelRes, voxelHit));
+                // return voxelRes;
+            }
 
-        return height;
+            RigidBody brushHit = null;
+            // Check if hitting static level objects (buildings and ramps)
+            foreach ( var brush in Physics.BrushObjects.ToArray())
+            {
+                if (!JBoundingBoxContains2DPoint(roughPosArea, brush.Position.X, brush.Position.Y))
+                    continue;
+
+                foreach (var brushShape in brush.Shapes)
+                {
+                    // TODO: There seems to be some issue with the voxel dimensions and/or position
+                    // Logger.Info($"Voxel Pos {voxel.Position}, Box {voxelShape.WorldBoundingBox}");
+                    if (!JBoundingBoxContains2DPoint(brushShape.WorldBoundingBox, refPos.X, refPos.Y))
+                        continue;
+
+                    if (brushShape.RayCast(traceOrigin, traceDirection, out var normal, out var lambda))
+                    {
+                        var targetHeightJPos = traceOrigin + lambda * traceDirection;
+                        // Check if closer AND below reference height
+                        if (lambda < brushDist && targetHeightJPos.Y <= refPos.Z)
+                        {
+                            brushRes = targetHeightJPos.Y;
+                            brushDist = lambda;
+                            brushHit = brush;
+                        }
+                        // TODO: Maybe add all possible hits to the list?
+                    }
+                }
+            }
+            // If we hit a brush, add that
+            if (brushRes > 0f)
+            {
+                hitResultList.Add((brushRes, brushHit));
+            }
+            
+            // Get from Heightmap tester only
+            hMapRes = GetHeightByRayCastOnHeightMapOnly(refPos, pos.Z);
+            if (hMapRes > 0)
+            {
+                hitResultList.Add((hMapRes, null));
+            }
+        }
+
+        // NOTE: Temporary disabled navmesh node assisted height detection (might not be needed in the future)
+        /*
+        // Check the netmission0.bai files node descriptors
+        var netMissionNodeDescriptorsRes = Template.GeoData?.GetHeight(refPos, pos.Z, GeoCheckMaxDistance) ?? 0f;
+        if (netMissionNodeDescriptorsRes > 0f)
+        {
+            hitResultList.Add(netMissionNodeDescriptorsRes);
+        }
+        */
+
+        hitResultList.Add((float.PositiveInfinity, null));
+        hitResultList.Sort();
+
+        // Find the lowest possible result
+        var hitRes = hitResultList[0];
+        for (var i = 1; i < hitResultList.Count; i++)
+        {
+            if (hitResultList[i].Item1 >= refPos.Z && hitResultList[i - 1].Item1 < refPos.Z)
+            {
+                hitRes = hitResultList[i - 1];
+                break;
+            }
+        }
+
+        if (hitRes.Item1 > 0f)
+        {
+            hitTarget = hitRes.Item2;
+            return hitRes.Item1;
+        }
+        
+        // Fallback to the old heightmap.dat data method (this mostly happens when world terrain hasn't been loaded yet) 
+        hMapRes = GetHeightUsingHeightMapDat(refPos.X, refPos.Y);
+        return hMapRes;
     }
 
+    /// <summary>
+    /// Gets height at target position using various methods (recommended way to get solid surface height)
+    /// Calls the main GetHeight(pos, hitTarget) and discards the hitTarget
+    /// </summary>
+    /// <param name="pos"></param>
+    /// <returns></returns>
+    public float GetHeight(Vector3 pos) => GetHeight(pos, out _);
+
+    /// <summary>
+    /// Gets height at target position using various methods (recommended way to get solid surface height)
+    /// Calls the main GetHeight(pos, hitTarget) and discards the hitTarget using Z = 0f
+    /// </summary>
+    public float GetHeight(float x, float y) => GetHeight(new Vector3(x, y, 0f), out _);
+    
     /// <summary>
     /// Get Sector at specific offset
     /// </summary>
@@ -745,4 +889,119 @@ public partial class WorldInstance(WorldTemplate template, uint channelId, bool 
     }
     
     #endregion events
+
+    /// <summary>
+    /// Gets a solid floor location using ray-casting on the heightmaptester
+    /// </summary>
+    /// <param name="targetPosition"></param>
+    /// <param name="defaultHeight">Height returned if no valid point has been found</param>
+    /// <returns></returns>
+    public float GetHeightByRayCastOnHeightMapOnly(Vector3 targetPosition, float defaultHeight)
+    {
+        var totalHeight = 0f;
+        var validCount = 0;
+        // var testCount = 0;
+
+        // If not initialized, return the reference point's height
+        if (Physics?._physWorld == null)
+            return defaultHeight;
+        
+        // Initially start from slightly above the reference point casting downwards, this should technically be the model's height + 1 or so 
+        var mainRayStart = new JVector(targetPosition.X, targetPosition.Z + 3f, targetPosition.Y);
+        if (Physics.WorldHeightMapTester.RayCast(mainRayStart, -JVector.UnitY, out var _, out var lambda))
+        {
+            // testCount++;
+            // Logger.Debug($"Total ray checks: {testCount}");
+            return mainRayStart.Y - lambda;
+        }
+
+        // If not a direct hit, scan the 5 x 5 cm area around the intended position and try to get its average
+        // If position is exactly between the two triangles, it will not hit anything. This is a workaround for this situation
+        for (var y = 0; y < 3; y++)
+        for (var x = 0; x < 3; x++)
+        {
+            // testCount++;
+            var v = new JVector(mainRayStart.X + (x * 0.05f), mainRayStart.Y, mainRayStart.Z + (y * 0.05f));
+            if (Physics.WorldHeightMapTester.RayCast(v, -JVector.UnitY, out _, out var nearPointDistance))
+            {
+                totalHeight += mainRayStart.Y - nearPointDistance;
+                validCount++;
+            }
+        }
+
+        // If there are still no hits, we might be under any floor, and we need to do a more dramatic raycast
+        if (validCount <= 0)
+        {
+            // testCount++;
+            mainRayStart = new JVector(targetPosition.X, 5000f, targetPosition.Y);
+            for (var y = 0; y < 3; y++)
+            for (var x = 0; x < 3; x++)
+            {
+                var v = new JVector(mainRayStart.X + (x * 0.05f), 5000f, mainRayStart.Z + (y * 0.05f));
+                if (Physics.WorldHeightMapTester.RayCast(v, -JVector.UnitY, out var _, out var nearMaxPointDistance))
+                {
+                    totalHeight += 5000f - nearMaxPointDistance;
+                    validCount++;
+                }
+            }
+        }
+
+        // Logger.Debug($"Total ray checks: {testCount} ({validCount} hits)");
+        return validCount > 0 ? totalHeight / validCount : 0f;
+    }
+
+    /// <summary>
+    /// Gets height at target position using interpolation from heightmap.dat data
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    public float GetHeightUsingHeightMapDat(float x, float y)
+    {
+        // return GetRawHeightMapHeight((int)x, (int)y); // <-- the old way we used to do things
+
+        // Get bordering points
+        var border = FindNearestSignificantPoints((int)Math.Floor(x), (int)Math.Floor(y));
+
+        // Get heights for these points
+        var heightTl = Template.GetHeightMapHeight(border.Left, border.Top);
+        var heightTr = Template.GetHeightMapHeight(border.Right, border.Top);
+        var heightBl = Template.GetHeightMapHeight(border.Left, border.Bottom);
+        var heightBr = Template.GetHeightMapHeight(border.Right, border.Bottom);
+        var offX = (x - border.Left) / 2;
+        var offY = (y - border.Top) / 2;
+        var height = Blerp(heightTl, heightTr, heightBl, heightBr, offX, offY); // bilinear interpolation
+
+        return height;
+    }
+
+    public void QueueTerrainObjectsLoading(WorldCell worldCell)
+    {
+        WorldCellTerrainQueue.Enqueue(worldCell);
+        // Create a new loading task if none active
+        if (WorldCellTerrainLoadingTask == null)
+        {
+            Logger.Debug($"Started new TerrainLoading Queue for loading Cell {worldCell}");
+            WorldCellTerrainLoadingTask = Task.Run(DoTerrainLoadingQueue);
+        }
+    }
+
+    private void DoTerrainLoadingQueue()
+    {
+        var cellsLoaded = 0;
+        while (WorldCellTerrainQueue.Count > 0)
+        {
+            if (WorldCellTerrainQueue.TryDequeue(out var cell))
+            {
+                Physics?.AddStaticTerrainObjects(cell);
+                cellsLoaded++;
+            }
+            else
+            {
+                Logger.Warn("Failed to retrieve cell for terrain objects loading queue.");
+            }
+        }
+        WorldCellTerrainLoadingTask = null;
+        Logger.Info($"Finished TerrainLoading Queue of {cellsLoaded} cells. ({GameService.TimeSinceStart} since server start)");
+    }
 }

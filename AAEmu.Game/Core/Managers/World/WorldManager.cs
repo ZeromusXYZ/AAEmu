@@ -7,7 +7,6 @@ using AAEmu.Commons.Exceptions;
 using AAEmu.Commons.IO;
 using AAEmu.Commons.Utils;
 using AAEmu.Game.Core.Managers.Id;
-using AAEmu.Game.Core.Managers;
 using AAEmu.Game.Core.Network.Game;
 using AAEmu.Game.Core.Packets.G2C;
 using AAEmu.Game.IO;
@@ -441,7 +440,7 @@ public class WorldManager(
         }
 
         // Load water data
-        world.LoadWaterBodies();
+        // world.LoadWaterBodies();
         world.InitShipStaticBarriers();
 
         // Create and start the actual physics engine
@@ -682,7 +681,7 @@ public class WorldManager(
         return worldTemplate.ZoneKeyByRegions[sx, sy];
     }
 
-    /// <summary>
+     /// <summary>
     /// Get "floor" height at a given position for a zone
     /// </summary>
     /// <param name="zoneKey">ZoneId used to find which world it needs to look in</param>
@@ -735,7 +734,7 @@ public class WorldManager(
         }
         if (AppConfiguration.Instance.World.GeoDataMode)
         {
-            height = world.Template.GeoData?.GetHeight(transform.World.Position) ?? 0f;
+            height = world.GetHeight(transform.World.Position);
         }
 
         // check, as there is no geodata for main_world yet
@@ -745,7 +744,7 @@ public class WorldManager(
             {
                 try
                 {
-                    height = world.GetHeight(transform.World.Position.X, transform.World.Position.Y);
+                    height = world.GetHeight(transform.World.Position);
                 }
                 catch
                 {

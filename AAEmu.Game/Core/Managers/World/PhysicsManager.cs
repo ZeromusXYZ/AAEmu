@@ -1,7 +1,11 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
 using AAEmu.Game.Core.Packets.G2C;
+using AAEmu.Game.IO;
 using AAEmu.Game.Models;
+using AAEmu.Game.Models.CryEngine;
+using AAEmu.Game.Models.CryEngine.Objects;
 using AAEmu.Game.Models.Game.DoodadObj.Static;
 using AAEmu.Game.Models.Game.Skills;
 using AAEmu.Game.Models.Game.Skills.SkillControllers;
@@ -16,6 +20,7 @@ using AAEmu.Game.Physics.Forces;
 using AAEmu.Game.Physics.HeightMaps;
 using AAEmu.Game.Physics.Util;
 using AAEmu.Game.Utils;
+using Jitter2.Collision.Shapes;
 using Jitter2.Dynamics;
 using Jitter2.LinearMath;
 
@@ -69,11 +74,13 @@ public class PhysicsManager
     // ReSharper disable once ChangeFieldTypeToSystemThreadingLock
     private readonly object _worldLock = new();
     private readonly List<RigidBody> _bodies = [];
+    public List<RigidBody> VoxelObjects { get; init; } = [];
+    public List<RigidBody> BrushObjects { get; init; } = [];
 
     /// <summary>
     /// Used heightmap tester, saved so it can be edited later
     /// </summary>
-    private HeightmapTester WorldHeightMapTester { get; set; }
+    public HeightmapTester WorldHeightMapTester { get; set; }
 
     /// <summary>
     /// Initialize the Physics engine and creates the ocean water body
@@ -95,7 +102,7 @@ public class PhysicsManager
     }
 
     /// <summary>
-    /// Create terrain data for the physics world (old)
+    /// Create terrain data for the physics world
     /// </summary>
     public void InitializeTerrain()
     {
@@ -105,35 +112,64 @@ public class PhysicsManager
         Logger.Debug($"{SimulationWorld.Template.Name} initializing terrain.");
         try
         {
-            var dataX = SimulationWorld.Template.CellX * WorldManager.CELL_HMAP_RESOLUTION;
-            var dataZ = SimulationWorld.Template.CellY * WorldManager.CELL_HMAP_RESOLUTION;
-            var hmapTerrain = new float[dataX, dataZ];
-            var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
-            var cellCount = 0;
-            for (var cellY = 0; cellY < SimulationWorld.Template.CellY; cellY++)
+            // If the template hasn't been loaded yet, then load the data into the template
+            if (SimulationWorld.Template.PhysicsHeightMap == null)
             {
-                for (var cellX = 0; cellX < SimulationWorld.Template.CellX; cellX++)
-                {
-                    cellCount++;
-                    var cell = SimulationWorld.Template.Cells[cellX, cellY];
-                    if (!cell.Loaded)
-                        continue; // ignore if not loaded
-                    for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
-                    for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
-                    {
-                        var x = cellX * WorldManager.CELL_HMAP_RESOLUTION + inX;
-                        var y = cellY * WorldManager.CELL_HMAP_RESOLUTION + inY;
-                        hmapTerrain[x, y] = cell.GetHeightMapDataInCell(x % WorldManager.CELL_HMAP_RESOLUTION,
-                            y % WorldManager.CELL_HMAP_RESOLUTION);
-                    }
-                }
+                // Get needed size
+                var dataX = SimulationWorld.Template.CellX * WorldManager.CELL_HMAP_RESOLUTION;
+                var dataZ = SimulationWorld.Template.CellY * WorldManager.CELL_HMAP_RESOLUTION;
+
+                // Create the arrays
+                var hmapTerrain = new float[dataX, dataZ];
+                var hmapMaterials = new byte[dataX, dataZ];
+
+                // Create related PhysicsHeightMap
+                var heightmap = new Heightmap(ref hmapTerrain, ref hmapMaterials);
+                SimulationWorld.Template.PhysicsHeightMap = heightmap;
+                WorldHeightMapTester = new HeightmapTester(SimulationWorld.Template.PhysicsHeightMap);
 
                 if (AppConfiguration.Instance.World.PreLoadTerrain)
-                    Logger.Debug($"Loading {SimulationWorld} heightmap data {cellCount / cellCountMax * 100f:F0}%");
+                {
+                    Logger.Debug(
+                        $"Loading {SimulationWorld} heightmap data of {SimulationWorld.Template.CellX * SimulationWorld.Template.CellY} cells");
+
+                    // Read the data
+                    var cellCountMax = SimulationWorld.Template.CellX * SimulationWorld.Template.CellY * 1f;
+                    var cellCount = 0;
+                    for (var cellY = 0; cellY < SimulationWorld.Template.CellY; cellY++)
+                    {
+                        for (var cellX = 0; cellX < SimulationWorld.Template.CellX; cellX++)
+                        {
+                            cellCount++;
+                            var cell = SimulationWorld.Template.Cells[cellX, cellY];
+                            cell.VerifyCellLoaded();
+                            if (!cell.Loaded)
+                                continue; // ignore if not loaded
+
+                            // Commented out as VerifyCellLoaded will already populate this
+                            /*
+                            var cellXOff = (cellX * WorldManager.CELL_HMAP_RESOLUTION);
+                            var cellYOff = (cellY * WorldManager.CELL_HMAP_RESOLUTION);
+                            for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
+                            for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
+                            {
+                                var x = cellXOff + inX;
+                                var y = cellYOff + inY;
+                                hmapTerrain[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                                hmapMaterials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
+                            }
+                            */
+
+                            if (cellCount % 16 == 0)
+                                Logger.Debug(
+                                    $"Loading {SimulationWorld} heightmap data {(cellCount / cellCountMax * 100f):F0}%");
+                        }
+                    }
+
+                }
             }
 
-            var heightmap = new Heightmap(hmapTerrain);
-            WorldHeightMapTester = new HeightmapTester(heightmap);
+            // Add heightmap tester object into this instance's physics engine
             _physWorld.BroadPhaseFilter = new HeightmapDetection(_physWorld, WorldHeightMapTester);
             _physWorld.DynamicTree.AddProxy(WorldHeightMapTester, false);
         }
@@ -144,6 +180,8 @@ public class PhysicsManager
 
         Logger.Info($"{SimulationWorld.Template.Name} initialized terrain.");
     }
+
+
 
     /// <summary>
     /// Starts the Physics processing thread
@@ -912,15 +950,345 @@ public class PhysicsManager
         }
 
         // Copy over cell's data
-        for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
+        for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
         {
-            for (var inY = 0; inY < WorldManager.CELL_HMAP_RESOLUTION; inY++)
+            for (var inX = 0; inX < WorldManager.CELL_HMAP_RESOLUTION; inX++)
             {
-                var x = cell.CellX * WorldManager.CELL_HMAP_RESOLUTION + inX;
-                var y = cell.CellY * WorldManager.CELL_HMAP_RESOLUTION + inY;
-                WorldHeightMapTester.Heightmap.RawHeights[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                var x = (cell.CellX * WorldManager.CELL_HMAP_RESOLUTION) + inX;
+                var y = (cell.CellY * WorldManager.CELL_HMAP_RESOLUTION) + inY;
+                WorldHeightMapTester.Heightmap.Heights[x, y] = cell.GetHeightMapDataInCell(inX, inY);
+                WorldHeightMapTester.Heightmap.Materials[x, y] = cell.GetMaterialsDataInCell(inX, inY);
             }
         }
+
         Logger.Trace($"Post-Loaded {SimulationWorld} Cell {cell.CellX}, {cell.CellY}");
+    }
+    
+    /// <summary>
+    /// Adds several static terrain objects from the objects.dat and visareas.dat files
+    /// Adds Voxel terrain
+    /// Adds Brush models (buildings/rocks/trees)
+    /// </summary>
+    /// <param name="worldCell"></param>
+    public void AddStaticTerrainVoxels(WorldCell worldCell)
+    {
+        if (worldCell == null)
+            return;
+
+        // Main objects list
+        var objectsLoadedCount = 0;
+        if (worldCell.LoadedObjectDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedObjectDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType6Voxel voxel)
+                {
+                    if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
+                    {
+                        if (AddVoxelTerrain(worldCell, voxel))
+                        {
+                            objectsLoadedCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Objects list in visareas
+        if (worldCell.LoadedVisAreasDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedVisAreasDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType6Voxel voxel)
+                {
+                    if (voxel.Parse() && voxel.MeshReader?.Vertices.Count > 2)
+                    {
+                        if (AddVoxelTerrain(worldCell, voxel))
+                        {
+                            objectsLoadedCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Logger.Debug($"Loaded {objectsLoadedCount} voxel objects into Cell {worldCell}");
+    }
+
+    /// <summary>
+    /// Adds several static terrain objects from the objects.dat and visareas.dat files
+    /// Adds Voxel terrain
+    /// Adds Brush models (buildings/rocks/trees)
+    /// </summary>
+    /// <param name="worldCell"></param>
+    public void AddStaticTerrainObjects(WorldCell worldCell)
+    {
+        if (worldCell == null)
+            return;
+        // Only load if enabled
+        if (!AppConfiguration.Instance.World.LoadBrushModels)
+            return;
+
+        // Main objects list
+        var objectsLoadedCount = 0;
+        if (worldCell.LoadedObjectDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedObjectDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType1Brush brush)
+                {
+                    if (AddBrushObject(worldCell, brush))
+                    {
+                        objectsLoadedCount++;
+                    }
+                }
+            }
+        }
+
+        // Objects list in visareas
+        if (worldCell.LoadedVisAreasDat != null)
+        {
+            foreach (var objectData in worldCell.LoadedVisAreasDat.PrefabsList)
+            {
+                if (objectData is ObjectDataType1Brush brush)
+                {
+                    if (AddBrushObject(worldCell, brush))
+                    {
+                        objectsLoadedCount++;
+                    }
+                }
+            }
+        }
+
+        Logger.Debug($"Loaded {objectsLoadedCount} brush objects into Cell {worldCell}");
+    }
+
+    /// <summary>
+    /// Adds a voxel object to a Cell
+    /// </summary>
+    /// <param name="cell"></param>
+    /// <param name="brush"></param>
+    private bool AddBrushObject(WorldCell cell, ObjectDataType1Brush brush)
+    {
+        var roughSize = Vector3.Distance(brush.StartPos, brush.EndPos);
+        // var roughSize = MathUtil.CalculateDistance(brush.StartPos, brush.EndPos, false);
+        if (AppConfiguration.Instance.World.LoadBrushMinimumSize > 0f && roughSize < AppConfiguration.Instance.World.LoadBrushMinimumSize)
+        {
+            // Too small to bother loading (if configured)
+            return false;
+        }
+        var timer = new Stopwatch();
+        timer.Start();
+        var cellOffset = cell.GetCellWorldOffset().ToJVector();
+
+        RigidBody brushObject = null;
+
+        var modelPathName = string.Empty;
+        // Try model first
+        var triangleList = new List<JTriangle>();
+        if (brush.MaterialId > 0)
+        {
+            var materialPathName = (
+                cell.MaterialListFiles != null && brush.MaterialId < cell.MaterialListFiles.MaterialsList.Count
+            )
+                ? cell.MaterialListFiles.MaterialsList[brush.MaterialId]
+                : string.Empty;
+
+            modelPathName = (
+                cell.StatObjsFiles != null && brush.PathId < cell.StatObjsFiles.MaterialList.Count
+            )
+                ? cell.StatObjsFiles.MaterialList[brush.PathId]
+                : string.Empty;
+
+            // Fully ignore nodraw objects
+            if ((modelPathName == "game/objects/nodraw") || (materialPathName == "game/objects/nodraw"))
+            {
+                return false; // Don't draw, so not adding
+            }
+
+            if (!string.IsNullOrWhiteSpace(modelPathName) && ClientFileManager.FileExists(modelPathName))
+            {
+                triangleList = CryEngineModelHelper.MakeModel(modelPathName, materialPathName);
+            }
+
+            if (triangleList.Count <= 0)
+            {
+                // Logger.Warn($"Was unable to load brush model: {modelPathName} for {cell.Template.Name} Cell {cell}");
+                return false;
+            }
+        }
+
+        if (triangleList.Count <= 0)
+        {
+            return false;
+        }
+
+        // Load triangles into a mesh
+        var brushMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
+        // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
+        var shapesToAdd = new List<RigidBodyShape>();
+        for (var i = 0; i < brushMesh.Indices.Length - 2; i++)
+        {
+            var voxelShape = new TriangleShape(brushMesh, i);
+            
+            // Apply transform before adding
+            var m3X3 = new JMatrix(
+                brush.Matrix3X4.M11, brush.Matrix3X4.M31, brush.Matrix3X4.M21,
+                brush.Matrix3X4.M13, brush.Matrix3X4.M33, brush.Matrix3X4.M23,
+                brush.Matrix3X4.M12, brush.Matrix3X4.M32, brush.Matrix3X4.M22);
+            var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+            shapesToAdd.Add(transformedShape);
+            
+            // shapesToAdd.Add(voxelShape);
+        }
+
+        lock (_worldLock)
+        {
+            // Only create the RigidBody if it has a texture and a shape
+            brushObject = _physWorld.CreateRigidBody();
+            brushObject.Tag = brush;
+            brushObject.AffectedByGravity = false;
+            brushObject.IsStatic = true;
+            brushObject.Position = cellOffset + new JVector(brush.Matrix3X4.M14, brush.Matrix3X4.M34, brush.Matrix3X4.M24);
+            /*
+            var m3X3 = new JMatrix(
+                brush.Matrix3X4.M11, brush.Matrix3X4.M31, brush.Matrix3X4.M21,
+                brush.Matrix3X4.M13, brush.Matrix3X4.M33, brush.Matrix3X4.M23,
+                brush.Matrix3X4.M12, brush.Matrix3X4.M32, brush.Matrix3X4.M22);
+            brushObject.Orientation = JQuaternion.CreateFromMatrix(m3X3);
+            */
+
+            // Add the new shapes
+            foreach (var rigidBodyShape in shapesToAdd)
+            {
+                brushObject.AddShape(rigidBodyShape, false); // Has no mass
+            }
+
+            // Apply Cell offset after transform
+            // brushObject.Position += cellOffset;
+
+            // Mark the floor as static
+            brushObject.IsStatic = true;
+            // brushObject.SetActivationState(true);
+            EnqueueAddBody(brushObject);
+
+            // Add to reference list
+            // Need to save them here for faster heightmap floor collision testing later
+            BrushObjects.Add(brushObject);
+        }
+
+        // Logger.Trace($"Loaded brush object {modelPathName} into Cell {cell}");
+        // TODO: Implement Brush instances instead of create the model every time
+        timer.Stop();
+        if (timer.ElapsedMilliseconds > 1000)
+        {
+            Logger.Warn($"Loading object for {cell.Template.Name} Cell {cell} took {timer.ElapsedMilliseconds} ms: {modelPathName}");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a voxel object to a Cell
+    /// </summary>
+    /// <param name="cell"></param>
+    /// <param name="voxel"></param>
+    private bool AddVoxelTerrain(WorldCell cell, ObjectDataType6Voxel voxel)
+    {
+        var cellOffset = cell.GetCellWorldOffset().ToJVector();
+
+        if (voxel.MeshReader == null)
+            return false;
+
+        RigidBody voxelObject = null;
+        lock (_worldLock)
+        {
+            voxelObject = _physWorld.CreateRigidBody();
+            voxelObject.Tag = voxel;
+            voxelObject.AffectedByGravity = false;
+            voxelObject.Position = new JVector(voxel.Matrix3X4.M14, voxel.Matrix3X4.M34, voxel.Matrix3X4.M24);
+        }
+
+        var triangleList = new List<JTriangle>();
+        for (var i = 0; i < voxel.MeshReader.Indices.Count - 2; i += 3)
+        {
+            var i1 = voxel.MeshReader.Indices[i];
+            var i2 = voxel.MeshReader.Indices[i + 1];
+            var i3 = voxel.MeshReader.Indices[i + 2];
+            var v1 = new JVector(voxel.MeshReader.Vertices[i1].X, voxel.MeshReader.Vertices[i1].Z,
+                voxel.MeshReader.Vertices[i1].Y);
+            var v2 = new JVector(voxel.MeshReader.Vertices[i2].X, voxel.MeshReader.Vertices[i2].Z,
+                voxel.MeshReader.Vertices[i2].Y);
+            var v3 = new JVector(voxel.MeshReader.Vertices[i3].X, voxel.MeshReader.Vertices[i3].Z,
+                voxel.MeshReader.Vertices[i3].Y);
+
+            triangleList.Add(new JTriangle(v1, v2, v3));
+        }
+
+        // Load triangles into a mesh
+        var voxelMesh = new TriangleMesh(triangleList, ignoreDegenerated: true);
+        // Add all the Mesh's triangles as shapes to the RigidBody of the voxel
+        lock (_worldLock)
+        {
+            for (var i = 0; i < voxelMesh.Indices.Length - 2; i++)
+            {
+                var voxelShape = new TriangleShape(voxelMesh, i);
+                
+                // Apply transform before adding
+                var m3X3 = new JMatrix(
+                    voxel.Matrix3X4.M11, voxel.Matrix3X4.M31, voxel.Matrix3X4.M21,
+                    voxel.Matrix3X4.M13, voxel.Matrix3X4.M33, voxel.Matrix3X4.M23,
+                    voxel.Matrix3X4.M12, voxel.Matrix3X4.M32, voxel.Matrix3X4.M22);
+                var transformedShape = new TransformedShape(voxelShape, JVector.Zero, m3X3);
+                    voxelObject.AddShape(transformedShape, false); // Has no mass
+                
+                voxelObject.AddShape(voxelShape, false);
+            }
+
+            // Apply Cell offset after transform
+            voxelObject.Position += cellOffset;
+            /*
+            var m3X3 = new JMatrix(
+                voxel.Matrix3X4.M11, voxel.Matrix3X4.M31, voxel.Matrix3X4.M21,
+                voxel.Matrix3X4.M13, voxel.Matrix3X4.M33, voxel.Matrix3X4.M23,
+                voxel.Matrix3X4.M12, voxel.Matrix3X4.M32, voxel.Matrix3X4.M22);
+            voxelObject.Orientation = JQuaternion.CreateFromMatrix(m3X3);
+            */
+
+            // Mark the floor as static
+            voxelObject.IsStatic = true;
+            // voxelObject.SetActivationState(true);
+            EnqueueAddBody(voxelObject);
+
+            // Add to reference list
+            VoxelObjects.Add(voxelObject); // Need to save them here for faster heightmap floor collision testing
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Updates NodeDescriptorList nodes to make them perfectly align with the surface. This should improve movement for AI
+    /// </summary>
+    public void ReAlignLoadedBaiNodePoints(WorldCell worldCell)
+    {
+        var timer = new Stopwatch();
+        timer.Start();
+        //lock (_worldLock)
+        {
+            foreach (var baseBaiLoader in worldCell.BaiLoader)
+            {
+                foreach (var netMissionReader in baseBaiLoader.NetMissionReaders)
+                {
+                    foreach (var (key, node) in netMissionReader.NodeDescriptorList)
+                    {
+                        var newPos = node.Pos with { Z = SimulationWorld.GetHeight(node.Pos, out _) };
+                        node.Pos = newPos;
+                    }
+                }
+            }
+        }
+        timer.Stop();
+        Logger.Debug($"ReAlignLoadedBaiNodePoints for {worldCell.Template.Name} Cell {worldCell.CellX:000}_{worldCell.CellY:000} took {timer.ElapsedMilliseconds} ms");
     }
 }

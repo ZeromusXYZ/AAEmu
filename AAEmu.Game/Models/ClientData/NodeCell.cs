@@ -1,30 +1,47 @@
-﻿using System.Drawing;
+using System.Drawing;
+using AAEmu.Game.Utils;
+using NLog;
 
 namespace AAEmu.Game.Models.ClientData;
 
-public class NodeCell
+public class NodeCell()
 {
+    private static Logger Logger { get; } = LogManager.GetCurrentClassLogger(); 
     private const int Inv5Cm = 20;
     private const uint Mask12Bit = (1 << 12) - 1;
+    private const byte HeightMapMaterialBitsCount = 5;
+    public const ushort HeightMapValueBits = 0b_1111_1111_1110_0000;
+    public const ushort HeightMapMaterialBits = 0b_0000_0000_0001_1111;
+    public const byte HeightMapMaterialHole = 0b_0001_1111;
+    public const ushort ShiftedHeightDataMaxValue = ushort.MaxValue >> HeightMapMaterialBitsCount;
 
     public byte Version { get; set; }
     public byte Dummy { get; set; }
     public byte Flags { get; set; }
     public byte Flags2 { get; set; }
-    public AABB BoxHeightmap { get; set; } = new();
-    public byte bHasHoles { get; set; }
-    public float fOffset { get; set; }
-    public float fRange { get; set; }
-    public int nSize { get; set; }
-    public ushort[] pHMData { get; set; }
+    public AABB BoxHeightmap { get; set; } = new ();
+    public byte NodeHasHoles { get; private set; }
+    private float FOffset { get; set; }
+    public float FRange { get; private set; }
+    public int NodeSize { get; private set; }
+    private ushort[] RawHeightMapData { get; set; }
+    /// <summary>
+    /// Processed (upscaled) converted actual height values
+    /// </summary>
+    public float[,] HeightData { get; init; } = new float[33, 33];
+    /// <summary>
+    /// Processed (to match upscaling) converted material Id for the points in HeightData
+    /// </summary>
+    public byte[,] MaterialData { get; init; } = new byte[33, 33];
 
-    private int iOffset;
-    private int iRange;
-    private int iStep;
-    private float fMin;
-    private float fMax;
+    private int IOffset { get; set; }
+    private int IRange { get; set; }
+    private int IStep { get; set; }
+    private float FMin { get; set; }
+    private float FMax { get; set; }
+    private double DoubleValue { get; set; }
 
-    public void Read(BinaryReader br, bool disabledReCalc = false)
+    public void Read(BinaryReader br)
     {
         Version = br.ReadByte();
         Dummy = br.ReadByte();
@@ -38,17 +55,17 @@ public class NodeCell
         BoxHeightmap.Max.Y = br.ReadSingle();
         BoxHeightmap.Max.Z = br.ReadSingle();
 
-        bHasHoles = br.ReadByte();
-        fOffset = br.ReadSingle();
+        NodeHasHoles = br.ReadByte();
+        FOffset = br.ReadSingle();
 
-        fRange = br.ReadSingle();
-        nSize = br.ReadInt32();
-        pHMData = new ushort[nSize * nSize];
+        FRange = br.ReadSingle();
+        NodeSize = br.ReadInt32();
+        RawHeightMapData = new ushort[NodeSize * NodeSize];
 
         var unkCount = br.ReadInt32();
 
-        for (var i = 0; i < pHMData.Length; i++)
-            pHMData[i] = br.ReadUInt16();
+        for (var i = 0; i < RawHeightMapData.Length; i++)
+            RawHeightMapData[i] = br.ReadUInt16();
 
         br.ReadInt32();
         br.ReadSingle();
@@ -59,127 +76,136 @@ public class NodeCell
         br.ReadBytes(36 + unkCount);
 
         Init();
-        if (!disabledReCalc && Version < 7)
-            RescaleToInt();
-        UpScale();
+        ConvertTo33By33();
     }
 
-    public float RawDataToHeight(uint data)
+    private float RawDataToHeight(ushort data)
     {
-        return 0.05f * iOffset + (data >> 4) * iStep * 0.05f;
-    }
-
-    public ushort RawDataByIndex(uint i)
-    {
-        return pHMData[i];
+        var shiftedVal = data >> HeightMapMaterialBitsCount;
+        var d = (float)shiftedVal / (float)ShiftedHeightDataMaxValue;
+        return float.Lerp(BoxHeightmap.Min.Z, BoxHeightmap.Max.Z, d);
+        // return 0.05f * IOffset + (data >> HeightMapMaterialBitsCount) * IStep * 0.05f;
     }
 
     public ushort RawDataByIndex(ushort nX, ushort nY)
     {
-        if (nSize > 0)
+        if (NodeSize > 0)
         {
-            var index = nX * nSize + nY;
-            if (index >= pHMData.Length)
+            var index = nX * NodeSize + nY;
+            if (index >= RawHeightMapData.Length)
                 return 0;
 
-            return pHMData[index];
+            return RawHeightMapData[index];
         }
 
         return 0;
     }
 
-    public float GetHeightByIndex(uint i)
-    {
-        return RawDataToHeight(pHMData[i]);
-    }
-
-    public float GetHeight(ushort nX, ushort nY)
-    {
-        if (nSize > 0)
-        {
-            var index = nX * nSize + nY;
-            return GetHeightByIndex((uint)index);
-        }
-
-        return 0f;
-    }
-
     private void Init()
     {
-        fMin = fOffset;
-        fMax = fMin + 0xFFF0 * fRange;
+        FMin = FOffset;
+        FMax = FMin + 0xFFF0 * FRange;
 
-        iOffset = (int)(fMin * Inv5Cm);
-        iRange = (int)((fMax - fMin) * Inv5Cm);
-        iStep = (int)(iRange > 0 ? (iRange + Mask12Bit - 1) / Mask12Bit : 1);
-    }
-
-    private void RescaleToInt()
-    {
-        for (var i = 0; i < pHMData.Length; i++)
-        {
-            var hraw = pHMData[i];
-
-            var height = fMin + (0xFFF0 & hraw) * fRange;
-            var hdec = (ushort)((int)((height - fMin) * Inv5Cm) / iStep);
-
-            var res = (hraw & 0xF) | (hdec << 4);
-            pHMData[i] = (ushort)res;
-        }
-    }
-
-    private static float Lerp(float s, float e, float t)
-    {
-        return s + (e - s) * t;
-    }
-
-    private static float Blerp(float cX0Y0, float cX1Y0, float cX0Y1, float cX1Y1, float tx, float ty)
-    {
-        return Lerp(Lerp(cX0Y0, cX1Y0, tx), Lerp(cX0Y1, cX1Y1, tx), ty);
+        IOffset = (int)(FMin * Inv5Cm);
+        IRange = (int)((FMax - FMin) * Inv5Cm);
+        IStep = (int)(IRange > 0 ? (IRange + Mask12Bit - 1) / Mask12Bit : 1);
+        DoubleValue = FRange * 100000d;
     }
 
     private Rectangle FindNearestSignificantPoints(int x, int y)
     {
-        return new Rectangle(x / nSize, y / nSize, 1, 1);
+        return new Rectangle(x / NodeSize, y / NodeSize, 1, 1);
     }
 
     private ushort GetRawHeight(int x, int y)
     {
-        return RawDataByIndex((ushort)x, (ushort)y);
+        return (ushort)(RawDataByIndex((ushort)x, (ushort)y) & HeightMapValueBits);
     }
 
-    private void UpScale()
+    private byte GetRawMaterial(int x, int y)
     {
-        if (nSize > 0 && nSize < 33)
+        return (byte)(RawDataByIndex((ushort)x, (ushort)y) & HeightMapMaterialBits);
+    }
+
+    /// <summary>
+    /// Make sure that the target "resolution" is 33x33
+    /// </summary>
+    private void ConvertTo33By33()
+    {
+        switch (NodeSize)
         {
-            var sourceScale = nSize / 33f;
-            var result = new ushort[33 * 33];
-
-            for (var targetX = 0; targetX <= 32; targetX++)
-                for (var targetY = 0; targetY <= 32; targetY++)
+            case > 0 and < 33:
                 {
-                    var index = targetX * 33 + targetY;
+                    var sourceScale = NodeSize / 33f;
 
-                    var sourceX = (ushort)Math.Floor(targetX * sourceScale);
-                    var sourceY = (ushort)Math.Floor(targetY * sourceScale);
+                    for (var targetX = 0; targetX <= 32; targetX++)
+                    for (var targetY = 0; targetY <= 32; targetY++)
+                    {
+                        // var index = targetX * 33 + targetY;
 
-                    var nearestRawPoints = FindNearestSignificantPoints(sourceX, sourceY);
+                        var sourceX = (ushort)Math.Floor(targetX * sourceScale);
+                        var sourceY = (ushort)Math.Floor(targetY * sourceScale);
 
-                    // Get heights for these points
-                    var rawHeightTL = GetRawHeight(nearestRawPoints.Left, nearestRawPoints.Top);
-                    var rawHeightTR = GetRawHeight(nearestRawPoints.Right, nearestRawPoints.Top);
-                    var rawHeightBL = GetRawHeight(nearestRawPoints.Left, nearestRawPoints.Bottom);
-                    var rawHeightBR = GetRawHeight(nearestRawPoints.Right, nearestRawPoints.Bottom);
-                    // Calculate offset within points
-                    var offX = targetX * sourceScale - sourceX;
-                    var offY = targetY * sourceScale - sourceY;
-                    var height = Blerp(rawHeightTL, rawHeightTR, rawHeightBL, rawHeightBR, offX, offY);
+                        var nearestRawPoints = FindNearestSignificantPoints(sourceX, sourceY);
 
-                    result[index] = (ushort)Math.Round(height);
-                    //result[index] = RawDataByIndex(sourceX, sourceY);
+                        // Get heights for these points
+                        var rawHeightTl = RawDataToHeight(GetRawHeight(nearestRawPoints.Left, nearestRawPoints.Top));
+                        var rawHeightTr = RawDataToHeight(GetRawHeight(nearestRawPoints.Right, nearestRawPoints.Top));
+                        var rawHeightBl = RawDataToHeight(GetRawHeight(nearestRawPoints.Left, nearestRawPoints.Bottom));
+                        var rawHeightBr = RawDataToHeight(GetRawHeight(nearestRawPoints.Right, nearestRawPoints.Bottom));
+
+                        // Calculate offset within points
+                        var offX = (targetX * sourceScale) - sourceX;
+                        var offY = (targetY * sourceScale) - sourceY;
+
+                        // Save into the actually used array
+                        HeightData[targetX, targetY] = MathUtil.Blerp(rawHeightTl, rawHeightTr, rawHeightBl, rawHeightBr, offX, offY);
+
+                        // "Merge" the materials flags and use that as a materials
+                        // If one of them is a hole (0x1F), they the result should also be a hole, just don't use them to draw the texture of the floor with it :)
+                        // TODO: Verify if it's actually flags and not values
+                        var averageMaterial =
+                            GetRawMaterial(nearestRawPoints.Left, nearestRawPoints.Top) |
+                            GetRawMaterial(nearestRawPoints.Right, nearestRawPoints.Top) |
+                            GetRawMaterial(nearestRawPoints.Left, nearestRawPoints.Bottom) |
+                            GetRawMaterial(nearestRawPoints.Right, nearestRawPoints.Bottom);
+                        MaterialData[targetX, targetY] = (byte)averageMaterial;
+                    }
+                    break;
                 }
+            case 0:
+                {
+                    for (var targetX = 0; targetX <= 32; targetX++)
+                    for (var targetY = 0; targetY <= 32; targetY++)
+                    {
+                        HeightData[targetX, targetY] = 0f; // TODO: does this need to be the minimum height of the box?
+                        MaterialData[targetX, targetY] = NodeHasHoles > 0 ? HeightMapMaterialHole : (byte)0;
+                    }
 
-            pHMData = result;
+                    break;
+                }
+            case 33:
+                {
+                    for (var targetX = 0; targetX <= 32; targetX++)
+                    for (var targetY = 0; targetY <= 32; targetY++)
+                    {
+                        HeightData[targetX, targetY] = RawDataToHeight(GetRawHeight(targetX, targetY));
+                        MaterialData[targetX, targetY] = GetRawMaterial(targetX, targetY);
+                    }
+                }
+                break;
+            case > 33:
+                Logger.Fatal($"Unsupported node size: {NodeSize}");
+                break;
         }
+    }
+
+    /// <summary>
+    /// Used for node sorting only, don't rely directly on this function
+    /// </summary>
+    /// <returns></returns>
+    public bool HasData()
+    {
+        return RawHeightMapData.Length > 0;
     }
 }

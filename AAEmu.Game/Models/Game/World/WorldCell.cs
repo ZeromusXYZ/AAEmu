@@ -3,6 +3,7 @@ using AAEmu.Game.Core.Managers.World;
 using AAEmu.Game.IO;
 using AAEmu.Game.Models.ClientData;
 using AAEmu.Game.Models.CryEngine.Loaders;
+using AAEmu.Game.Models.CryEngine.Objects;
 using Jitter2.LinearMath;
 using NLog;
 
@@ -18,9 +19,17 @@ public class WorldCell
     public bool Loaded { get; private set; }
     private readonly Lock _loadLock = new();
     private Vector3 CellOffset { get; set; }
-    internal ushort[,] HeightMap { get; private set; }
+    internal float[,] HeightMap { get; private set; }
+    internal byte[,] MaterialsMap { get; private set; }
     private float MinHeight { get; set; }
     private float MaxHeight { get; set; }
+    public Hmap LoadedHmap { get; private set; }
+    public ObjectsFile LoadedObjectDat { get; set; }
+    public VisAreasFile LoadedVisAreasDat { get; set; }
+    public MaterialsFile MaterialFiles { get; set; }
+    public MaterialsListFile MaterialListFiles { get; set; }
+    public MaterialsFile StatObjsFiles { get; set; }
+
 
     /// <summary>
     /// Bai files data to use in this cell
@@ -31,6 +40,9 @@ public class WorldCell
     /// Bounding box for use in Jitter
     /// </summary>
     public JBoundingBox BoundingBox { get; private set; }
+
+    public string CellFolder => Path.Combine("game", "worlds", Template.Name, "cells", $"{CellX:000}_{CellY:000}");
+
 
     public WorldCell(int cellX, int cellY, WorldTemplate template)
     {
@@ -113,12 +125,12 @@ public class WorldCell
 
         lock (_loadLock)
         {
-            if (Loaded)
-                return this;
-
-            HeightMap = new ushort[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
+            // Assign heightmap array
+            HeightMap = new float[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
+            MaterialsMap = new byte[WorldManager.CELL_HMAP_RESOLUTION, WorldManager.CELL_HMAP_RESOLUTION];
+            // Load data
             LoadBaiFiles();
-            Loaded = LoadCellHeightMapFromClientData();
+            Loaded = LoadCellDataFromClient();
         }
         return this;
     }
@@ -128,10 +140,10 @@ public class WorldCell
     /// </summary>
     /// <returns></returns>
     /// <exception cref="NotSupportedException"></exception>
-    private bool LoadCellHeightMapFromClientData()
+    private bool LoadCellDataFromClient()
     {
-        var cellFileName = $"{CellX:000}_{CellY:000}";
-        var heightMapFile = Path.Combine("game", "worlds", Template.Name, "cells", cellFileName, "client", "terrain", "heightmap.dat");
+        var cellFolder = CellFolder;
+        var heightMapFile = Path.Combine(cellFolder, "client", "terrain", "heightmap.dat");
         if (!ClientFileManager.FileExists(heightMapFile))
         {
             return true;
@@ -147,20 +159,15 @@ public class WorldCell
 
         // Read the cell hmap data
         using var br = new BinaryReader(stream);
-        var hmap = new Hmap();
+        LoadedHmap = new Hmap();
 
-        if (hmap.Read(br, false) < 0)
+        if (LoadedHmap.Read(br) < 0)
         {
             Logger.Error($"Error reading {heightMapFile}");
             return false;
         }
 
-        // Sort nodes by position
-        var sortedNodes = hmap.Nodes
-            .OrderBy(cell => cell.BoxHeightmap.Min.X)
-            .ThenBy(cell => cell.BoxHeightmap.Min.Y)
-            .Where(x => x.pHMData.Length > 0)
-            .ToList();
+        LoadedHmap.SortNodes();
 
         // Read nodes into heightmap array
         #region ReadNodes
@@ -169,37 +176,123 @@ public class WorldCell
         MaxHeight = 0f;
         for (ushort sectorX = 0; sectorX < WorldManager.SECTORS_PER_CELL; sectorX++) // 16x16 sectors / cell
         for (ushort sectorY = 0; sectorY < WorldManager.SECTORS_PER_CELL; sectorY++)
-        for (ushort unitX = 0; unitX < WorldManager.SECTOR_HMAP_RESOLUTION; unitX++) // sector = 32x32 unit size
-        for (ushort unitY = 0; unitY < WorldManager.SECTOR_HMAP_RESOLUTION; unitY++)
         {
-            var node = sortedNodes[sectorX * WorldManager.SECTORS_PER_CELL + sectorY];
-            var oX = sectorX * WorldManager.SECTOR_HMAP_RESOLUTION + unitX;
-            var oY = sectorY * WorldManager.SECTOR_HMAP_RESOLUTION + unitY;
+            var node = LoadedHmap.SortedNodes[sectorX * WorldManager.SECTORS_PER_CELL + sectorY];
+            // var doubleValue = node.FRange * 100000d;
 
-            var height = node.GetHeight(unitX, unitY);
-            var value = (ushort)(height * Template.HeightMaxCoefficient);
+            for (ushort unitX = 0; unitX < WorldManager.SECTOR_HMAP_RESOLUTION; unitX++) // sector = 32x32 unit size
+            for (ushort unitY = 0; unitY < WorldManager.SECTOR_HMAP_RESOLUTION; unitY++)
+            {
+                var oX = sectorX * WorldManager.SECTOR_HMAP_RESOLUTION + unitX;
+                var oY = sectorY * WorldManager.SECTOR_HMAP_RESOLUTION + unitY;
+                
+                /*
+                var rawValue = node.RawDataByIndex(unitX, unitY);
+                var rawHeight = (ushort)(rawValue & NodeCell.HeightMapValueBits);
+                var rawMaterial = (byte)(rawValue & NodeCell.HeightMapMaterialBits);
+                MaterialsMap[oX, oY] = rawMaterial;
 
-            HeightMap[oX, oY] = value;
-            MinHeight = MathF.Min((float)(value / Template.HeightMaxCoefficient), MinHeight);
-            MaxHeight = MathF.Max((float)(value / Template.HeightMaxCoefficient), MaxHeight);
+                var value = (ushort)(rawHeight * Template.HeightMaxCoefficient);
+
+                HeightMap[oX, oY] = (ushort)(
+                    doubleValue / 1.52604335620711 * Template.HeightMaxCoefficient / ushort.MaxValue * rawHeight +
+                    node.BoxHeightmap.Min.Z * Template.HeightMaxCoefficient);
+                */
+                var value = node.HeightData[unitX, unitY];
+                HeightMap[oX, oY] = value;
+                MaterialsMap[oX, oY] = node.MaterialData[unitX, unitY];
+
+                MinHeight = MathF.Min(value, MinHeight);
+                MaxHeight = MathF.Max(value, MaxHeight);
+            }
         }
+
         #endregion
 
-        // Update bounding box
+        // Update cell bounding box
         BoundingBox = new JBoundingBox(
             new JVector(CellOffset.X, MinHeight, CellOffset.Y), 
             new JVector(CellOffset.X + WorldManager.CELL_SIZE, MaxHeight, CellOffset.Y + WorldManager.CELL_SIZE)
         );
+        
+        // Load Materials data
+        var materialListFile = Path.Combine(cellFolder, "client", "material_list.dat");
+        if (ClientFileManager.FileExists(materialListFile))
+        {
+            var materialList = new MaterialsListFile(materialListFile);
+            materialList.ReadFile();
+            MaterialListFiles = materialList;
+        }
 
-        #region update_physics_hmap
+        var materialFile = Path.Combine(cellFolder, "client", "materials.dat");
+        if (ClientFileManager.FileExists(materialFile))
+        {
+            var materials = new MaterialsFile(materialFile);
+            materials.ReadFile();
+            MaterialFiles = materials;
+        }
+
+        var statObjFile = Path.Combine(cellFolder, "client", "statobjs.dat");
+        if (ClientFileManager.FileExists(statObjFile))
+        {
+            var statObjs = new MaterialsFile(statObjFile);
+            statObjs.ReadFile();
+            StatObjsFiles = statObjs;
+        }
+
+        // Load object.dat file
+        var objectDatFile = Path.Combine(cellFolder, "client", "object.dat");
+        if (ClientFileManager.FileExists(objectDatFile))
+        {
+            var objects = new ObjectsFile(objectDatFile);
+            if (objects.ReadFile())
+            {
+                LoadedObjectDat = objects;
+                // Logger.Debug($"Loaded objects from {objectDatFile}");
+            }
+            else
+            {
+                LoadedObjectDat = objects;
+                if (objects.AssetPathsList.Count > 0 || objects.PrefabsList.Count > 0)
+                    Logger.Error($"Error loading objects from {objectDatFile}, only {objects.AssetPathsList.Count} assets and {objects.PrefabsList.Count} prefabs read");
+            }
+        }
+
+        // Load visareas.dat file
+        var visAreasDatFile = Path.Combine(cellFolder, "client", "visareas.dat");
+        if (ClientFileManager.FileExists(visAreasDatFile))
+        {
+            var visObjects = new VisAreasFile(visAreasDatFile);
+            if (visObjects.ReadFile())
+            {
+                LoadedVisAreasDat = visObjects;
+                // Logger.Debug($"Loaded objects from {objectDatFile}");
+            }
+            else
+            {
+                LoadedVisAreasDat = visObjects;
+                if (visObjects.AssetPathsList.Count > 0 || visObjects.PrefabsList.Count > 0 || visObjects.VisAreas.Count > 0)
+                    Logger.Error($"Error loading objects from {visAreasDatFile}, only {visObjects.AssetPathsList.Count} assets, {visObjects.PrefabsList.Count} prefabs and {visObjects.VisAreas.Count} visareas read");
+            }
+        }
 
         // Update Physics world's heightmaps
-        // TODO: Merge local heightmap into physics engine
-        foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id))
+        foreach (var worldInstance in WorldManager.Instance.GetWorldsByTemplate(Template.Id).ToArray())
         {
             worldInstance.Physics?.UpdateHeightMapFromCellBody(this);
+            // worldInstance.Physics?.AddHeightMapMeshFromCellBody(this);
+            worldInstance.Water.AddFromCellData(this);
+            // Add voxel terrain
+            worldInstance.Physics?.AddStaticTerrainVoxels(this);
+            // Add the remaining brush objects async
+            worldInstance.QueueTerrainObjectsLoading(this);
+            // worldInstance.Physics?.ReAlignLoadedBaiNodePoints(this);
         }
-        #endregion
+        
+#if EXPORT_CELL_ON_LOAD
+        if (CellX == 13 && CellY == 10) // Ezna
+            ExportThisCell();
+#endif
         return true;
     }
 
@@ -222,6 +315,24 @@ public class WorldCell
     }
 
     /// <summary>
+    /// Gets heightmap height at target data position, converted to float, but not smoothened
+    /// </summary>
+    /// <param name="heightMapDataX"></param>
+    /// <param name="heightMapDataY"></param>
+    /// <returns></returns>
+    public byte GetMaterialsDataInCell(int heightMapDataX, int heightMapDataY)
+    {
+        if (HeightMap == null ||
+            heightMapDataX < 0 || heightMapDataX > WorldManager.CELL_HMAP_RESOLUTION ||
+            heightMapDataY < 0 || heightMapDataY > WorldManager.CELL_HMAP_RESOLUTION)
+        {
+            return NodeCell.HeightMapMaterialHole; // out of bounds or not loaded, return as hole
+        }
+
+        return MaterialsMap[heightMapDataX, heightMapDataY];
+    }
+
+    /// <summary>
     /// Gets height at target world position
     /// </summary>
     /// <param name="x"></param>
@@ -232,5 +343,15 @@ public class WorldCell
         var xx = (int)(x - CellOffset.X) / 2;
         var yy = (int)(y - CellOffset.Y) / 2;
         return GetHeightMapDataInCell(xx, yy);
+    }
+
+    public Vector3 GetCellWorldOffset()
+    {
+        return new Vector3(CellX * WorldManager.CELL_SIZE, CellY * WorldManager.CELL_SIZE, 0f);
+    }
+
+    public override string ToString()
+    {
+        return $"{CellX:000}_{CellY:000}";
     }
 }

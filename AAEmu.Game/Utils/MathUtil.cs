@@ -438,4 +438,33 @@ public class MathUtil
             angle += 360.0;
         return angle;
     }
+
+    /// <summary>
+    /// Get interpolated value between 4 value points of a rectangle by it's x and y offset
+    /// </summary>
+    /// <param name="cX0Y0"></param>
+    /// <param name="cX1Y0"></param>
+    /// <param name="cX0Y1"></param>
+    /// <param name="cX1Y1"></param>
+    /// <param name="tx"></param>
+    /// <param name="ty"></param>
+    /// <returns></returns>
+    public static float Blerp(float cX0Y0, float cX1Y0, float cX0Y1, float cX1Y1, float tx, float ty)
+    {
+        return float.Lerp(float.Lerp(cX0Y0, cX1Y0, tx), float.Lerp(cX0Y1, cX1Y1, tx), ty);
+    }
+    
+    /// <summary>
+    /// Get interpolated position between 2 points
+    /// </summary>
+    /// <param name="firstVector"></param>
+    /// <param name="secondVector"></param>
+    /// <param name="by"></param>
+    /// <returns></returns>
+    public static Vector2 Lerp(Vector2 firstVector, Vector2 secondVector, float by)
+    {
+        var retX = float.Lerp(firstVector.X, secondVector.X, by);
+        var retY = float.Lerp(firstVector.Y, secondVector.Y, by);
+        return new Vector2(retX, retY);
+    }
 }

@@ -15,6 +15,7 @@ public class WorldConfig
     {
         /// <summary>Retail-like: wind only along N↔S axis. 15 angle bonus for wind in the direction of the ship.</summary>
         Official,
+
         /// <summary>More realistic: wind direction rotates smoothly over the day.</summary>
         Realistic
     }
@@ -125,6 +126,16 @@ public class WorldConfig
     /// Configure in <c>AAEmu.Game/Configurations/World.json</c> under <c>World.UsePersistentHouseDoodads</c>.
     /// </summary>
     public bool UsePersistentHouseDoodads { get; set; } = false;
+
+    /// <summary>
+    /// Enables loading of brush objects from object.dat and related files.
+    /// </summary>
+    public bool LoadBrushModels { get; set; } = false;
+
+    /// <summary>
+    /// When LoadBrushModels is enabled, only load/add objects that are at least this large (bounding diagonal box size)
+    /// </summary>
+    public float LoadBrushMinimumSize { get; set; } = 15.0f;
 }
 
 public class DungeonLoadConfig

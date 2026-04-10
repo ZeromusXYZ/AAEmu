@@ -1,4 +1,6 @@
-﻿using Jitter2.Collision;
+using System;
+using AAEmu.Game.Models.ClientData;
+using Jitter2.Collision;
 using Jitter2.LinearMath;
 
 namespace AAEmu.Game.Physics.HeightMaps;
@@ -9,9 +11,10 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
     public int NodePtr { get; set; }
     public Heightmap Heightmap { get; init; }
     public JVector Velocity => JVector.Zero;
-    public JBoundingBox WorldBoundingBox { get; }
-    public JVector WorldBoxSize { get; }
-    public ulong MinIndex { get; }
+    public JBoundingBox WorldBoundingBox { get; init; }
+    public JVector WorldBoxSize { get; init; }
+    public ulong MinIndex { get; init; }
+    public ulong MaxIndex { get; init; }
 
     public HeightmapTester(Heightmap heightmap)
     {
@@ -21,7 +24,7 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
             WorldBoundingBox.Max.X - WorldBoundingBox.Min.X,
             WorldBoundingBox.Max.Y - WorldBoundingBox.Min.Y,
             WorldBoundingBox.Max.Z - WorldBoundingBox.Min.Z);
-        (MinIndex, _) = Jitter2.World.RequestId((int)WorldBoxSize.X * (int)WorldBoxSize.Z * 2);
+        (MinIndex, MaxIndex) = Jitter2.World.RequestId((int)WorldBoxSize.X * (int)WorldBoxSize.Z);
     }
 
     /// <summary>
@@ -77,22 +80,11 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
     }
 
     /// <summary>
-    /// Gets height at target position (stored data for that world position)
-    /// </summary>
-    /// <param name="x">nearest X world position to use</param>
-    /// <param name="z">nearest Y world position to use</param>
-    /// <returns></returns>
-    public float GetHeight(int x, int z)
-    {
-        return Heightmap?.GetHeight(x, z) ?? 0f;
-    }
-
-    /// <summary>
     /// RayCast helper
     /// </summary>
     public bool RayCast(in JVector origin, in JVector direction, out JVector normal, out float lambda)
     {
-        const float MaxDistance = 100.0f;
+        const float MaxDistance = 5000.0f;
 
         var dirX = direction.X;
         var dirZ = direction.Z;
@@ -127,14 +119,32 @@ public class HeightmapTester : IDynamicTreeProxy, IRayCastable
             if (x < WorldBoundingBox.Min.X || x > WorldBoundingBox.Max.X || WorldBoundingBox.Min.Z < 0 || z > WorldBoundingBox.Max.Z)
                 goto continue_walk;
 
+            var ma = Heightmap.GetMaterial(x + 0, z + 0);
+            var mb = Heightmap.GetMaterial(x + 1, z + 0);
+            var mc = Heightmap.GetMaterial(x + 1, z + 1);
+            var md = Heightmap.GetMaterial(x + 0, z + 1);
+            var ha = ma == NodeCell.HeightMapMaterialHole;
+            var hb = mb == NodeCell.HeightMapMaterialHole;
+            var hc = mc == NodeCell.HeightMapMaterialHole;
+            var hd = md == NodeCell.HeightMapMaterialHole;
             // check this quad!
-            var a = new JVector(x + 0, GetHeight(x + 0, z + 0), z + 0);
-            var b = new JVector(x + 1, GetHeight(x + 1, z + 0), z + 0);
-            var c = new JVector(x + 1, GetHeight(x + 1, z + 1), z + 1);
-            var d = new JVector(x + 0, GetHeight(x + 0, z + 1), z + 1);
+            var a = new JVector(x + 0, Heightmap.GetHeight(x + 0, z + 0), z + 0);
+            var b = new JVector(x + 1, Heightmap.GetHeight(x + 1, z + 0), z + 0);
+            var c = new JVector(x + 1, Heightmap.GetHeight(x + 1, z + 1), z + 1);
+            var d = new JVector(x + 0, Heightmap.GetHeight(x + 0, z + 1), z + 1);
 
-            RayCastTriangle(origin, direction, a, b, c, out var normal0, out var lambda0);
-            RayCastTriangle(origin, direction, a, c, d, out var normal1, out var lambda1);
+            //  A - B
+            //  | \ |
+            //  D - C
+            var normal0 = JVector.Zero;
+            var lambda0 = float.MaxValue;
+            if (!ha && !hb && !hc)
+                RayCastTriangle(origin, direction, a, b, c, out normal0, out lambda0);
+
+            var normal1 = JVector.Zero;
+            var lambda1 = float.MaxValue;
+            if (!ha && !hc && !hd)
+                RayCastTriangle(origin, direction, a, c, d, out normal1, out lambda1);
 
             if (lambda0 < float.MaxValue || lambda1 < float.MaxValue)
             {

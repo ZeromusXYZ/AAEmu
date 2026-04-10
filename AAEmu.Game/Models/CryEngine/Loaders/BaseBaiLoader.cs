@@ -21,10 +21,10 @@ public class BaseBaiLoader(WorldTemplate parentWorldTemplate)
     public List<NetMissionReader> NetMissionReaders { get; } = [];
 
     private bool LoadVertexMission { get; set; } = false;
-    private List<VertexMissionReader> VertexMissionReaders { get; } = [];
+    public List<VertexMissionReader> VertexMissionReaders { get; } = [];
 
     private bool LoadHideMission { get; set; } = false;
-    private List<NetMissionReader> HideMissionReaders { get; } = [];
+    public List<NetMissionReader> HideMissionReaders { get; } = [];
 
     /// <summary>
     /// Loads .bai files data from a given zone or path folder
