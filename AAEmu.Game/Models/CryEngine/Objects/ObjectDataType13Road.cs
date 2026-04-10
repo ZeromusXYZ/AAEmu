@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace AAEmu.Game.Models.CryEngine.Objects;
 
-public class ObjectDataType13Road() : ObjectDataBase(13)
+public class ObjectDataType13Road() : ObjectDataBase(ObjectDataType.Road)
 {
     public override bool IsGeneric { get; protected init; } = false;
     private int ArrayCount { get; set; }
@@ -10,7 +10,7 @@ public class ObjectDataType13Road() : ObjectDataBase(13)
 
     public override int ReadData(byte[] blockData, int offset)
     {
-        var objectType = BitConverter.ToInt32(blockData, offset + 0x00);
+        var objectType = (ObjectDataType)BitConverter.ToInt32(blockData, offset + 0x00);
         if (objectType != PrefabType || (offset + 44 > blockData.Length))
         {
             // Type mismatch or not enough bytes, return as error

@@ -35,15 +35,26 @@ public class WaterBodies
 
         lock (_lock)
         {
+            var totalFlow = Vector3.Zero;
+            var targets = 0;
             // TODO: take the top-most water area in case of overlaps
+            
             foreach (var area in Areas)
             {
                 if (area.GetSurface(point, out var surfacePoint, out flowDirection) &&
                     point.Z <= surfacePoint.Z &&
                     point.Z >= surfacePoint.Z - area.Depth)
-                    return true;
+                {
+                    totalFlow += flowDirection;
+                    targets++;
+                }
             }
 
+            if (targets > 0)
+            {
+                flowDirection = totalFlow;
+                return true;
+            }
         }
         flowDirection = Vector3.Zero;
         return false;
@@ -201,63 +212,69 @@ public class WaterBodies
         }
         if (prefab is ObjectDataType11Water water)
         {
-
-            // Does this water body have a border defined?
-            // If yes, use its shape
-            if (water.BorderPointsList.Count >= 2)
+            if (water.ShapePointsList.Count >= 4 && water.VolumeType == WaterObjectVolumeType.River)
             {
-                var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}",
-                    WaterBodyAreaType.Polygon);
-                newLake.Depth = water.Depth; // water.EndPos.Z - water.StartPos.Z;
-                // TODO: check what the rest of DATA does before the vector array
-                // There is likely information related to river directions and speed in there
-                foreach (var v3 in water.BorderPointsList)
+                // If segments are defined, create a legacy LineArray from them.
+                // TODO: update WaterBodyAreaType.LineArray so it can have variable widths for each segment.
+                // Current implementation is only a approximation, but should be good enough for now.
+                // Or implement this in another way.
+                var newRiver = new WaterBodyArea($"Segment_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.LineArray);
+                newRiver.Depth = water.Depth;
+                var maxWidth = 1f;
+                for (var i = 0; i+2 < water.ShapePointsList.Count; i+=2)
                 {
-                    var p = cellOffset + v3 with { Z = water.SurfaceHeight };
-                    if (!newLake.Points.Contains(p)) // Filter the duplicates
-                        newLake.Points.Add(p);
+                    var pointA = water.ShapePointsList[i];
+                    var pointB = water.ShapePointsList[i+1];
+                    var radius = Vector3.Distance(pointA, pointB) / 2f;
+                    var centerPoint = (((pointA + pointB) / 2f) + cellOffset) with { Z = water.SurfaceHeight };
+                    if (!newRiver.Points.Contains(centerPoint)) // Filter the duplicates
+                    {
+                        newRiver.Points.Add(centerPoint);
+                        maxWidth = Math.Max(maxWidth, radius);
+                    }
                 }
-
-                // Close the loop
-                newLake.Points.Add(newLake.Points[0]);
-
-                newLake.UpdateBounds();
-                newLake.Speed = water.Speed;
+                newRiver.RiverWidth = maxWidth;
+                newRiver.Speed = water.Speed;
+                newRiver.UpdateBounds();
                 lock (_lock)
                 {
-                    newLake.Id = (uint)Areas.Count;
-                    Areas.Add(newLake);
-                }
-            }
-            else if (water.SegmentPointsList.Count >= 2)
-            {
-                // TODO: How to handle the in-shape values if border is not defined
-                var newLake = new WaterBodyArea($"Segment_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}", WaterBodyAreaType.Polygon);
-                newLake.Depth = water.Depth; // water.EndPos.Z - water.StartPos.Z;
-                // TODO: check what the rest of DATA does before the vector array
-                // There is likely information related to river directions and speed in there
-                foreach (var v3 in water.SegmentPointsList)
-                {
-                    var p = cellOffset + v3 with { Z = water.SurfaceHeight };
-                    if (!newLake.Points.Contains(p)) // Filter the duplicates
-                        newLake.Points.Add(p);
-                }
-
-                // Close the loop
-                newLake.Points.Add(newLake.Points[0]);
-                newLake.UpdateBounds();
-                newLake.Speed = water.Speed;
-                lock (_lock)
-                {
-                    newLake.Id = (uint)Areas.Count;
-                    Areas.Add(newLake);
+                    newRiver.Id = (uint)Areas.Count;
+                    Areas.Add(newRiver);
                 }
             }
             else
+            if (water.PhysicsContourPointsList.Count >= 2 && water.VolumeType == WaterObjectVolumeType.Area)
             {
-                Logger.Warn($"Water without data found at Cell {worldCell.CellX:000}-{worldCell.CellY:000} prefab Idx: {prefabIdx}");
+                // Does this water body have a border defined?
+                var newLake = new WaterBodyArea($"Water_C{worldCell.CellX}-{worldCell.CellY}_{prefabIdx}",
+                    WaterBodyAreaType.Polygon);
+                newLake.Depth = water.Depth;
+                foreach (var v3 in water.PhysicsContourPointsList)
+                {
+                    var p = cellOffset + v3 with { Z = water.SurfaceHeight };
+                    if (!newLake.Points.Contains(p)) // Filter the duplicates
+                        newLake.Points.Add(p);
+                }
+
+                // Close the loop
+                newLake.Points.Add(newLake.Points[0]);
+
+                newLake.UpdateBounds();
+                newLake.Speed = water.Speed;
+                lock (_lock)
+                {
+                    newLake.Id = (uint)Areas.Count;
+                    Areas.Add(newLake);
+                }
             }
-            // return;
+            else if (water.VolumeType == WaterObjectVolumeType.Ocean)
+            {
+                // Ignore oceans
+            }
+            else
+            {
+                Logger.Debug($"Don't know what to do with volume {water.VolumeType} @ {worldCell.CellX}-{worldCell.CellY}_{prefabIdx}");
+            }
         }
     }
 }

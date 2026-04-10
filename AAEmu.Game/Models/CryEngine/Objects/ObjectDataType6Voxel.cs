@@ -5,7 +5,7 @@ using CgfConverter.Structs;
 
 namespace AAEmu.Game.Models.CryEngine.Objects;
 
-public class ObjectDataType6Voxel() : ObjectDataBase(6)
+public class ObjectDataType6Voxel() : ObjectDataBase(ObjectDataType.Voxel)
 {
     public List<byte[]> ChunkData { get; set; } = [];
 
@@ -88,7 +88,7 @@ public class ObjectDataType6Voxel() : ObjectDataBase(6)
             var currentOffset = 0;
 
             // Main Header
-            var objectType = BitConverter.ToInt32(Data, currentOffset);
+            var objectType = (ObjectDataType)BitConverter.ToInt32(Data, currentOffset);
             currentOffset += 4;
             if (PrefabType != objectType)
             {

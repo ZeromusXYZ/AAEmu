@@ -3,29 +3,29 @@ using CgfConverter.Structs;
 
 namespace AAEmu.Game.Models.CryEngine.Objects;
 
-public class ObjectDataBase(int prefabType)
+public class ObjectDataBase(ObjectDataType prefabType)
 {
-    private static Dictionary<int, int> ObjectTotalSizesByType { get; } = new()
+    private static Dictionary<ObjectDataType, int> ObjectTotalSizesByType { get; } = new()
     {
-        {1, 132},  // Brushes
-        {2, 68},   // Vegetation
-        {4, 100},  // 
-        {5, 124},  //
+        {ObjectDataType.Brush, 132},  // 1, Brushes
+        {ObjectDataType.Vegetation, 68},   // 2, Vegetation
+        {(ObjectDataType)4, 100},  // 
+        {(ObjectDataType)5, 124},  //
                    // Voxel (type 6) is variable size
                    // 7?
-        {8, 196},  //
-        {9, 115},  // Decal
+        {(ObjectDataType)8, 196},  //
+        {ObjectDataType.Decal, 115},  // Decal
                    // 10?
                    // Water (type 11) is variable size
                    // 12?
                    // Roads (type 13) is variable size
-        {14, 83},  // Distance Clouds
+        {ObjectDataType.AutoCubeMap, 83},  // Distance Clouds
                    // 15 ... 26?
-        {27, 652}, // 
+        {ObjectDataType.Type27, 652}, // 
     };
 
     public string Name { get; set; }
-    public int PrefabType { get; init; } = prefabType;
+    public ObjectDataType PrefabType { get; init; } = prefabType;
     public virtual bool IsGeneric { get; protected init; } = true;
     public byte[] Data { get; set; } = [];
 

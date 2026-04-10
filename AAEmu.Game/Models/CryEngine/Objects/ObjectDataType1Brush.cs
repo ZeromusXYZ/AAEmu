@@ -3,7 +3,7 @@ using CgfConverter.Structs;
 
 namespace AAEmu.Game.Models.CryEngine.Objects;
 
-public class ObjectDataType1Brush() : ObjectDataBase(1)
+public class ObjectDataType1Brush() : ObjectDataBase(ObjectDataType.Brush)
 {
     public Vector3 StartPos { get; set; } = Vector3.Zero;
     public Vector3 EndPos { get; set; } = Vector3.Zero;
