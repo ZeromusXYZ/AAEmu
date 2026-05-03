@@ -123,7 +123,7 @@ public class PlotTree(uint plotId)
                 else
                 {
                     queue.Enqueue((node, item.timestamp, item.targetInfo));
-                    FlushExecutionQueue(executeQueue, state);
+                    FlushExecutionQueue(executeQueue, state, false);
                 }
 
                 if (queue.Count > 0)
@@ -140,7 +140,7 @@ public class PlotTree(uint plotId)
                     Logger.Trace($"Event:{node.Event.Id} Took {nodeWatch.ElapsedMilliseconds} to finish.");
             }
 
-            FlushExecutionQueue(executeQueue, state);
+            FlushExecutionQueue(executeQueue, state, true);
         }
         catch (Exception e)
         {
@@ -221,7 +221,7 @@ public class PlotTree(uint plotId)
             //Logger.Debug($"Plot {PlotId}: No channeling node to transition to.");
         }
     }
-    private static void FlushExecutionQueue(Queue<(PlotNode node, PlotTargetInfo targetInfo)> executeQueue, PlotState state)
+    private static void FlushExecutionQueue(Queue<(PlotNode node, PlotTargetInfo targetInfo)> executeQueue, PlotState state, bool finalPlot)
     {
 
         var packets = new CompressedGamePackets();
@@ -233,8 +233,11 @@ public class PlotTree(uint plotId)
 
         if (packets.Packets.Count > 0)
         {
-            var lastPacket = packets.Packets.Last(p => p is SCPlotEventPacket) as SCPlotEventPacket;
-            lastPacket?.SetFlag(6);
+            if (finalPlot)
+            {
+                var lastPacket = packets.Packets.Last(p => p is SCPlotEventPacket) as SCPlotEventPacket;
+                lastPacket?.SetFlag(6);
+            }
             state.Caster.BroadcastPacket(packets, true);
         }
     }
