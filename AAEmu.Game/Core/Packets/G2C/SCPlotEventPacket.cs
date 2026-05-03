@@ -52,4 +52,10 @@ public class SCPlotEventPacket(
         }
         return stream;
     }
+
+    public void SetFlag(byte newFlagValue)
+    {
+        flag = newFlagValue;
+
+    }
 }

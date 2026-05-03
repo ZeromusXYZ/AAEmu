@@ -232,7 +232,11 @@ public class PlotTree(uint plotId)
         }
 
         if (packets.Packets.Count > 0)
+        {
+            var lastPacket = packets.Packets.Last(p => p is SCPlotEventPacket) as SCPlotEventPacket;
+            lastPacket?.SetFlag(6);
             state.Caster.BroadcastPacket(packets, true);
+        }
     }
 
     private static void EndPlotChannel(PlotState state)
