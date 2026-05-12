@@ -39,6 +39,7 @@ public class SkillManager(IAnimationManager animationManager, IPlotManager plotM
     private Dictionary<uint, List<CombatBuffTemplate>> _combatBuffs;
     private Dictionary<uint, SkillReagent> _skillReagents;
     private Dictionary<uint, SkillProduct> _skillProducts;
+    private Dictionary<uint, LinearFuncTemplate> _linearFuncs;
     // private HashSet<ushort> _skillIds = new();
     // private ushort _skillIdIndex = 1;
 
@@ -288,6 +289,7 @@ public class SkillManager(IAnimationManager animationManager, IPlotManager plotM
         };
 
         _buffs = [];
+        _linearFuncs = [];
         // TODO 
         /*
             _effects.Add("PlayLogEffect", new Dictionary<uint, EffectTemplate>()); // missing from the effect table
@@ -725,6 +727,24 @@ public class SkillManager(IAnimationManager animationManager, IPlotManager plotM
                             LinearLevelBonus = reader.GetInt32("linear_level_bonus")
                         };
                         buff.Bonuses.Add(template);
+                    }
+                }
+            }
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT * FROM linear_funcs";
+                command.Prepare();
+                using (var reader = new SQLiteWrapperReader(command.ExecuteReader()))
+                {
+                    while (reader.Read())
+                    {
+                        var template = new LinearFuncTemplate()
+                        {
+                            Id = reader.GetUInt32("id"),
+                            StartValue = reader.GetInt32("start_value"),
+                            EndValue = reader.GetInt32("end_value")
+                        };
+                        _linearFuncs.Add(template.Id, template);
                     }
                 }
             }
@@ -1848,5 +1868,9 @@ public class SkillManager(IAnimationManager animationManager, IPlotManager plotM
 
         return null;
     }
-    
+
+    public LinearFuncTemplate GetLinearFunc(uint funcId)
+    {
+        return _linearFuncs.GetValueOrDefault(funcId);
+    }
 }

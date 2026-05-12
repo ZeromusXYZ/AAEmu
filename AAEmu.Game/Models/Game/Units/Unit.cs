@@ -227,6 +227,7 @@ public class Unit : BaseUnit, IUnit
     public DateTime SkillLastUsed { get; set; }
     public PlotState ActivePlotState { get; set; }
     public Dictionary<uint, List<Bonus>> Bonuses { get; set; }
+    public Dictionary<uint, List<DynamicBonus>> DynamicBonuses { get; set; }
     public UnitCooldowns Cooldowns { get; set; }
     public virtual Expedition Expedition { get; set; }
 
@@ -655,6 +656,34 @@ public class Unit : BaseUnit, IUnit
         }
     }
 
+    public override void AddDynamicBonus(uint bonusIndex, DynamicBonus bonus)
+    {
+        var bonuses = DynamicBonuses.TryGetValue(bonusIndex, out var bonusList) ? bonusList : [];
+        bonuses.Add(bonus);
+        DynamicBonuses[bonusIndex] = bonuses;
+    }
+
+    public override void RemoveDynamicBonus(uint bonusIndex, UnitAttribute attribute)
+    {
+        if (!DynamicBonuses.TryGetValue(bonusIndex, out var dynamicBonuses))
+        {
+            return;
+        }
+
+        foreach (var dynamicBonus in new List<DynamicBonus>(dynamicBonuses))
+        {
+            if (dynamicBonus != null && dynamicBonus.Template.Attribute == attribute)
+            {
+                dynamicBonuses.Remove(dynamicBonus);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a list of currently applied bonuses
+    /// </summary>
+    /// <param name="attribute"></param>
+    /// <returns></returns>
     public List<Bonus> GetBonuses(UnitAttribute attribute)
     {
         var result = new List<Bonus>();
@@ -675,11 +704,37 @@ public class Unit : BaseUnit, IUnit
         return result;
     }
 
+    /// <summary>
+    /// Gets a list of currently applied bonuses
+    /// </summary>
+    /// <param name="attribute"></param>
+    /// <returns></returns>
+    public List<DynamicBonus> GetDynamicBonuses(UnitAttribute attribute)
+    {
+        var result = new List<DynamicBonus>();
+        if (Bonuses == null)
+        {
+            return result;
+        }
+        foreach (var bonuses in new List<List<DynamicBonus>>(DynamicBonuses.Values))
+        {
+            foreach (var bonus in new List<DynamicBonus>(bonuses))
+            {
+                if (bonus != null && bonus.Template.Attribute == attribute)
+                {
+                    result.Add(bonus);
+                }
+            }
+        }
+        return result;
+    }
+
     public double CalculateWithBonuses(double value, UnitAttribute attr)
     {
         // Calculate flat values first, then percent values after that
         var bonuses = GetBonuses(attr);
-
+        var dynamicBonuses = GetDynamicBonuses(attr);
+        
         // Flat values
         foreach (var bonus in bonuses)
         {
@@ -688,12 +743,35 @@ public class Unit : BaseUnit, IUnit
             value += bonus.Value;
         }
 
+        // Dynamic Flat values
+        foreach (var dynamicBonus in dynamicBonuses)
+        {
+            if (dynamicBonus.Template.ModifierType != UnitModifierType.Value)
+                continue;
+
+            if (dynamicBonus.Evaluate(out var val))
+            {
+                value += val;
+            }
+        }
+
         // Percent Values
         foreach (var bonus in bonuses)
         {
             if (bonus.Template.ModifierType != UnitModifierType.Percent)
                 continue;
             value += value * bonus.Value / 100f;
+        }
+
+        // Dynamic Percent Values
+        foreach (var dynamicBonus in dynamicBonuses)
+        {
+            if (dynamicBonus.Template.ModifierType != UnitModifierType.Percent)
+                continue;
+            if (dynamicBonus.Evaluate(out var val))
+            {
+                value += value * val / 100f;
+            }
         }
 
         return value;
