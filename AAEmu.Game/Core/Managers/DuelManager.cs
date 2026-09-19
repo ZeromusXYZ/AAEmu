@@ -6,7 +6,7 @@ using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
 using AAEmu.Game.Models.Game.DoodadObj;
 using AAEmu.Game.Models.Game.Duels;
-using AAEmu.Game.Models.Game.Units;
+using AAEmu.Game.Models.Game.GameConfigs;
 using AAEmu.Game.Models.StaticValues;
 using AAEmu.Game.Models.Tasks.Duels;
 using AAEmu.Game.Utils;
@@ -15,14 +15,16 @@ using NLog;
 
 namespace AAEmu.Game.Core.Managers;
 
-public class DuelManager : Singleton<DuelManager>, IDuelManager
+public class DuelManager(IGameContentManager gameContentManager) : Singleton<DuelManager>, IDuelManager
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
 
     private DoodadSpawner _combatFlag;
     private const double Delay = 1000; // 1 sec
-    private const float DistanceForSurrender = 75; // square 75 meters
-    private const double DuelDurationTime = 5;    // 5 min
+    private float DistanceForSurrender { get; } = gameContentManager.GetContentConfig(ContentConfigEnum.DuelDistance).Value; // 100m
+    private const double DuelDurationTime = 5; // 5 min
+    private const uint DuelFlagDoodadId = 5014;
+    private const uint DuelBubbleChatType = 543;
 
     // there can be several duels at the same time
     private readonly ConcurrentDictionary<uint, Duel> _duels = new();
@@ -49,7 +51,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
 
     public void DuelRequest(Character challenger, uint challengedId)
     {
-        // приходит ID того, кого вызвали на дуэль
+        // The ID of the person challenged to a duel is displayed
         var challenged = WorldManager.Instance.GetCharacterById(challengedId);
         var duel = new Duel(challenger, challenged);
         DuelAdd(duel);
@@ -60,12 +62,12 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
     public void DuelAccepted(Character challenged, uint challengerId)
     {
         ArgumentNullException.ThrowIfNull(challenged);
-        // приходит ID того, кто вызвал на дуэль
+        // The ID of the person who challenged them to a duel is returned
         try
         {
             var duel = _duels[challengerId];
 
-            if (duel.DuelStarted == false)
+            if (!duel.DuelStarted)
             {
                 duel.DuelStarted = true;
                 duel.Challenger.IsInDuel = true;
@@ -74,7 +76,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
                 // spawn flag
                 _combatFlag = new DoodadSpawner
                 {
-                    ParentWorld = challenged.ParentWorld, Id = 0, UnitId = 5014, // Combat Flag Id=5014;
+                    ParentWorld = challenged.ParentWorld, Id = 0, UnitId = DuelFlagDoodadId, // Combat Flag Id=5014;
                     Position = duel.Challenger.Transform.CloneAsSpawnPosition()
                 };
                 _combatFlag.Position.X = duel.Challenger.Transform.World.Position.X - (duel.Challenger.Transform.World.Position.X - duel.Challenged.Transform.World.Position.X) / 2;
@@ -84,11 +86,11 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
                 duel.DuelFlag = _combatFlag.Spawn(0); // set CombatFlag
 
                 // change the faction temporarily
-                // TODO: Handle pets/vehicle factions
+                // TODO: Handle pets/vehicle factions, needs to be handled by player's SetFaction
                 SetFaction(duel.Challenger, FactionsEnum.RedTeam);
                 SetFaction(duel.Challenged, FactionsEnum.BlueTeam);
 
-                //Schedule duel start task.
+                // Schedule duel start task.
                 duel.DuelStartTask = new DuelStartTask(duel.Challenger.Id);
                 TaskManager.Instance.Schedule(duel.DuelStartTask, TimeSpan.FromSeconds(3));
             }
@@ -105,14 +107,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
     private void SetFaction(Character owner, FactionsEnum factionId)
     {
         // change the faction temporarily
-        if (SaveFactions.ContainsKey(owner.Id))
-        {
-            SaveFactions[owner.Id] = owner.Faction.Id;
-        }
-        else
-        {
-            SaveFactions.Add(owner.Id, owner.Faction.Id);
-        }
+        SaveFactions[owner.Id] = owner.Faction.Id;
 
         owner.SetFaction(factionId);
     }
@@ -130,7 +125,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
         {
             var duel = _duels[id];
             duel.SendPacketsBoth(new SCDuelStartedPacket(duel.Challenger.ObjId, duel.Challenged.ObjId));
-            duel.SendPacketsBoth(new SCAreaChatBubblePacket(true, duel.Challenger.ObjId, 543));
+            duel.SendPacketsBoth(new SCAreaChatBubblePacket(true, duel.Challenger.ObjId, DuelBubbleChatType));
             //duel.SendPacketChallenger(new SCAreaChatBubblePacket(true, duel.Challenged.ObjId, 543));
             duel.SendPacketsBoth(new SCDuelStartCountdownPacket());
             duel.SendPacketsBoth(new SCDuelStatePacket(duel.Challenger.ObjId, duel.DuelFlag.ObjId));
@@ -145,10 +140,10 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
             duel.DuelEndTimerTask = new DuelEndTimerTask(duel, duel.Challenger.Id);
             TaskManager.Instance.Schedule(duel.DuelEndTimerTask, TimeSpan.FromMinutes(DuelDurationTime));
 
-            // запустим проверку на дистанцию
+            // Let's run a distance check
             _ = DuelDistanceСheck(duel.Challenger.Id);
 
-            // запустим проверку на количество жизни
+            // Let's run a check on the health values
             _ = DuelResultСheck(duel.Challenger.Id);
         }
         catch (Exception e)
@@ -240,8 +235,7 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
 
             if (duel.DuelFlag != null)
             {
-                duel.DuelFlag.Delete(); //Remove Flag
-                // Remove Flag
+                duel.DuelFlag.Delete(); // Remove the Duel Flag
                 duel.SendPacketsBoth(new SCDoodadRemovedPacket(duel.DuelFlag.ObjId));
             }
 
@@ -291,29 +285,29 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
         try
         {
             var duel = _duels[id];
-            // проверяем, сбежали от флага или нет
+            // Let's check if they ran away from the flag or not
             var currentDistance = MathUtil.CalculateDistance(duel.DuelFlag.Transform.World.Position, duel.Challenger.Transform.World.Position, true);
             if (currentDistance >= DistanceForSurrender)
             {
                 // отключаем таймер
                 if (duel.DuelDistanceСheckTask == null)
-                    return DuelDistance.ChallengerFar; // сдается тот, кто вызывал на дуэль, т.е. убежал от флага
+                    return DuelDistance.ChallengerFar; // The one who challenged the other to a duel - that is, who ran away from the flag — is considered to have lost.
 
                 _ = duel.DuelDistanceСheckTask.Cancel();
                 duel.DuelDistanceСheckTask = null;
-                return DuelDistance.ChallengerFar; // сдается тот, кто вызывал на дуэль, т.е. убежал от флага
+                return DuelDistance.ChallengerFar; // The one who challenged the other to a duel - that is, who ran away from the flag — is considered to have lost.
             }
-            // проверяем, сбежали от флага или нет
+            // Let's check if they ran away from the flag or not
             currentDistance = MathUtil.CalculateDistance(duel.DuelFlag.Transform.World.Position, duel.Challenged.Transform.World.Position, true);
             if (currentDistance >= DistanceForSurrender)
             {
                 // отключаем таймер
                 if (duel.DuelDistanceСheckTask == null)
-                    return DuelDistance.ChallengedFar; // сдается тот, кого вызвали на дуэль, т.е. убежал от флага
+                    return DuelDistance.ChallengedFar; // The one who was challenged to a duel is considered to have surrendered — that is, he fled from the flag.
 
                 _ = duel.DuelDistanceСheckTask.Cancel();
                 duel.DuelDistanceСheckTask = null;
-                return DuelDistance.ChallengedFar; // сдается тот, кого вызвали на дуэль, т.е. убежал от флага
+                return DuelDistance.ChallengedFar; // The one who was challenged to a duel is considered to have surrendered — that is, he fled from the flag.
             }
 
             duel.DuelDistanceСheckTask = new DuelDistanceСheckTask(duel);
@@ -323,8 +317,8 @@ public class DuelManager : Singleton<DuelManager>, IDuelManager
         {
             // id is missing in the database
             Logger.Warn($"DistanceСheck: Id={id} not found in duels[], error code: {e}");
-            return DuelDistance.Error;  // рядом с флагом
+            return DuelDistance.Error;  // next to the flag
         }
-        return DuelDistance.Near;  // рядом с флагом
+        return DuelDistance.Near;  // next to the flag
     }
 }
