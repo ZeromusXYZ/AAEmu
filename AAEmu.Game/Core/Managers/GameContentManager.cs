@@ -7,11 +7,11 @@ namespace AAEmu.Game.Core.Managers;
 public class GameContentManager : Singleton<GameContentManager>, IGameContentManager
 {
 
-    private Dictionary<uint, ContentConfig> _contentConfig;
+    private Dictionary<ContentConfigEnum, ContentConfig> _contentConfig;
     private bool _loaded = false;
 
     // Getters
-    public ContentConfig GetContentConfig(uint contentId)
+    public ContentConfig GetContentConfig(ContentConfigEnum contentId)
     {
         return _contentConfig.GetValueOrDefault(contentId);
     }
@@ -21,7 +21,7 @@ public class GameContentManager : Singleton<GameContentManager>, IGameContentMan
         if (_loaded)
             return;
 
-        _contentConfig = new Dictionary<uint, ContentConfig>();
+        _contentConfig = new Dictionary<ContentConfigEnum, ContentConfig>();
 
         using (var connection = SQLite.CreateConnection())
         {
@@ -35,7 +35,7 @@ public class GameContentManager : Singleton<GameContentManager>, IGameContentMan
                     {
                         var config = new ContentConfig()
                         {
-                            Id = reader.GetUInt32("id"),
+                            Id = (ContentConfigEnum)reader.GetUInt32("id"),
                             KindId = reader.GetUInt32("kind_id"),
                             Value = reader.GetInt32("value"),
                         };

@@ -277,7 +277,7 @@ public class UnitReqs
 
             case UnitReqsKindType.LaborPowerMargin:
                 var remainingLaborMargin =
-                    TimedRewardsManager.GetMaxLabor(player?.Connection?.Payment?.PremiumState ?? false) -
+                    TimedRewardsManager.Instance.GetMaxLabor(player?.Connection?.Payment?.PremiumState ?? false) -
                     player?.LaborPower ?? 0;
                 return RetWithValue(SkillResultKeys.skill_urk_labor_power_margin, Value1, Value1 <= remainingLaborMargin);
 
