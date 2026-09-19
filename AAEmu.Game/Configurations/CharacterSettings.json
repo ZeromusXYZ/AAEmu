@@ -38,6 +38,7 @@
 		"TickAmountPremium": 100,
 		"TickMinutes": 5
 	},
+	"LaborSettingsOverride": true,
 	"Labor": {
 		"DailyLogin": 0,
 		"Default": 50,
@@ -46,8 +47,8 @@
 		"TickMinutes": 5
 	},
 	"LaborOffline": {
-		"DailyLogin": 0, // unused
-		"Default": 0, // unused
+		"DailyLogin": 0,
+		"Default": 0,
 		"TickAmount": 0,
 		"TickAmountPremium": 5,
 		"TickMinutes": 5

@@ -33,6 +33,7 @@ public partial class AppConfiguration
     public DungeonsConfig Dungeons { get; set; }
     public Dictionary<string, int> AccessLevel { get; set; } = [];
     public AccountConfig Account { get; set; }
+    public bool LaborSettingsOverride { get; set; }
     public CurrencyValuesConfig Labor { get; set; }
     public CurrencyValuesConfig LaborOffline { get; set; }
     public CurrencyValuesConfig Credits { get; set; }

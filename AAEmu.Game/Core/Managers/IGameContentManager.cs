@@ -4,5 +4,5 @@ namespace AAEmu.Game.Core.Managers;
 
 public interface IGameContentManager : ILoadable
 {
-    ContentConfig GetContentConfig(uint contentId);
+    ContentConfig GetContentConfig(ContentConfigEnum contentId);
 }
