@@ -21,9 +21,10 @@ public enum ContentConfigEnum : uint
     QuestLetItDone = 16,
     QuestOverDone = 17,
     AdjustRatioPerTrade = 18,
-    // 19
+    RegulateRation = 19,
     RegulateDownTime = 20,
-    // 20 .. 22
+    RegulateUpTime = 21,
+    CoinPerGoldRation = 22,
     ActabilityMinDiceRatio = 23,
     // 24
     LpStart = 25,
