@@ -4,7 +4,7 @@ public class ContentConfig
 {
     /// <summary>Content ID number</summary>
     public ContentConfigEnum Id { get; init; }
-    /// <summary>Not sure what kind represents here</summary>
+    /// <summary>Not sure what kind represents here, in later versions this value is not present</summary>
     public uint KindId { get; init; }
     /// <summary>Raw value for this content setting</summary>
     public int Value { get; init; } 
