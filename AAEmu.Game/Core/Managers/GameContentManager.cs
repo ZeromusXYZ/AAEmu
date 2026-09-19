@@ -1,4 +1,4 @@
-﻿using AAEmu.Commons.Utils;
+using AAEmu.Commons.Utils;
 using AAEmu.Game.Models.Game.GameConfigs;
 using AAEmu.Game.Utils.DB;
 

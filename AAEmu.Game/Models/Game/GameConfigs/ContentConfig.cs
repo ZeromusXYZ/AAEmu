@@ -1,4 +1,4 @@
-﻿namespace AAEmu.Game.Models.Game.GameConfigs;
+namespace AAEmu.Game.Models.Game.GameConfigs;
 
 public class ContentConfig
 {
