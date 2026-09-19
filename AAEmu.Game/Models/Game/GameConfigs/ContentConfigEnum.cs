@@ -1,4 +1,4 @@
-﻿namespace AAEmu.Game.Models.Game.GameConfigs;
+namespace AAEmu.Game.Models.Game.GameConfigs;
 
 // The latest client reports the following enums (needs verification if actually used)
 public enum ContentConfigEnum : uint
