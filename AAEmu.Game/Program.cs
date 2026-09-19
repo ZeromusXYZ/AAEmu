@@ -118,6 +118,9 @@ public static class Program
                 services.AddSingleton<AccessLevelManager>();
                 services.AddSingleton<IAccessLevelManager>(sp => sp.GetRequiredService<AccessLevelManager>());
 
+                services.AddSingleton<GameContentManager>();
+                services.AddSingleton<IGameContentManager>(sp => sp.GetRequiredService<GameContentManager>());
+
                 services.AddSingleton<AccountManager>();
                 services.AddSingleton<IAccountManager>(sp => sp.GetRequiredService<AccountManager>());
 
