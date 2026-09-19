@@ -2,6 +2,7 @@
 using AAEmu.Game.Models;
 using AAEmu.Game.Models.Game;
 using AAEmu.Game.Models.Game.Char;
+using AAEmu.Game.Models.Game.GameConfigs;
 using AAEmu.Game.Models.Game.Items;
 using AAEmu.Game.Models.Game.Items.Actions;
 using AAEmu.Game.Models.Game.Mails;
@@ -13,7 +14,7 @@ using NLog;
 
 namespace AAEmu.Game.Core.Managers.World;
 
-public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
+public class SpecialtyManager(IGameContentManager gameContentManager) : Singleton<SpecialtyManager>, ISpecialtyManager
 {
     private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
 
@@ -119,11 +120,17 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
 
     public void Initialize()
     {
+        var consumeCheckTime = AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+            ? TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioDecreaseTickMinutes)
+            : TimeSpan.FromMilliseconds(gameContentManager.GetContentConfig(ContentConfigEnum.RegulateDownTime).Value);
         var ratioConsumeTask = new SpecialtyRatioConsumeTask();
-        TaskManager.Instance.Schedule(ratioConsumeTask, TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioDecreaseTickMinutes), TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioDecreaseTickMinutes));
+        TaskManager.Instance.Schedule(ratioConsumeTask, consumeCheckTime, consumeCheckTime);
 
+        var regenTime = AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+            ? TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioRegenTickMinutes)
+            : TimeSpan.FromMilliseconds(gameContentManager.GetContentConfig(ContentConfigEnum.RegulateUpTime).Value);
         var ratioRegenTask = new SpecialtyRatioRegenTask();
-        TaskManager.Instance.Schedule(ratioRegenTask, TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioRegenTickMinutes), TimeSpan.FromMinutes(AppConfiguration.Instance.Specialty.RatioRegenTickMinutes));
+        TaskManager.Instance.Schedule(ratioRegenTask, regenTime, regenTime);
     }
 
     private void OnItemsLoaded(object sender, EventArgs e)
@@ -226,7 +233,11 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
 
         Logger.Info($"GetBasePriceForSpecialty - bundleIdAtNpc: {bundleIdAtNpc}, bundleMapping: {bundleMapping.Values.Count} items, bundleItem: Id {bundleItem.Id} - ItemId {bundleItem.ItemId} - SpecialtyBundleId {bundleItem.SpecialtyBundleId}");
         var item = bundleItem.Item ?? ItemManager.Instance.GetTemplate(bundleItem.ItemId);
-        return (int)(Math.Floor(bundleItem.Profit * (bundleItem.Ratio / 1000f)) + (item?.Refund ?? 0));
+
+        var ratioMod = gameContentManager.GetContentConfig(ContentConfigEnum.RatioMod).Value * 1f;
+        if (ratioMod <= 0)
+            ratioMod = 1000f;
+        return (int)(Math.Floor(bundleItem.Profit * (bundleItem.Ratio / ratioMod)) + (item?.Refund ?? 0));
     }
 
     public int SellSpecialty(Character player, uint npcObjId)
@@ -259,7 +270,15 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
 
         // TODO: Get crafter ID of trade-pack
         var crafterId = backpack.MadeUnitId != player.Id ? backpack.MadeUnitId : 0;
-        var sellerShare = 0.80f; // 80% default, set this to 1f for packs that don't share profit
+        // 80% default, set this to 1f for packs that don't share profit
+        var sellerShare = gameContentManager.GetContentConfig(ContentConfigEnum.SellerShareRatio).Value / 10f; // weirdly seems to be a factor of 10?
+        if (sellerShare <= 0f)
+        {
+            // Something went wrong, and we manually override it here, also prevents getting nothing
+            Logger.Warn("There was seller ration setting found, reverting to 80%");
+            sellerShare = 0.80f;
+        }
+
 
         var interestRate = 5;
 
@@ -274,12 +293,17 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
         var amountOfItemsCrafter = 0;
         var amountOfItemsBase = basePrice;
 
+        var itemsPerColdRatio = gameContentManager.GetContentConfig(ContentConfigEnum.CoinPerGoldRation).Value * 1f;
+        if (itemsPerColdRatio <= 0f)
+            itemsPerColdRatio = 1_00_00f;
+            
+
         if (npc.Template.SpecialtyCoinId != 0)
         {
             // Items are listed in the DB at the same rate as "amounts of gold" so the value needs to be divided by 10000
-            amountOfItemsTotalPayout = (int)Math.Round(amountOfItemsTotalPayout / 10000f);
-            amountOfItemsSeller = (int)Math.Round(amountOfItemsSeller / 10000f);
-            amountOfItemsBase = (int)Math.Round(basePrice / 10000f);
+            amountOfItemsTotalPayout = (int)Math.Round(amountOfItemsTotalPayout / itemsPerColdRatio);
+            amountOfItemsSeller = (int)Math.Round(amountOfItemsSeller / itemsPerColdRatio);
+            amountOfItemsBase = (int)Math.Round(basePrice / itemsPerColdRatio);
         }
         else
         {
@@ -345,12 +369,17 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
                 if (count <= 0)
                     continue;
 
-                var ratioDecrease = (int)Math.Ceiling(count * AppConfiguration.Instance.Specialty.RatioDecreasePerPack);
+                var ratioDecrease = AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+                    ? (int)Math.Ceiling(count * AppConfiguration.Instance.Specialty.RatioDecreasePerPack)
+                    : (int)Math.Ceiling(count * gameContentManager.GetContentConfig(ContentConfigEnum.AdjustRatioPerTrade).Value / 1000f);
                 InitRatioInZoneForPack(itemId, zoneGroupId);
                 _soldPackAmountInTick[itemId][zoneGroupId] = 0;
 
                 var initialRatio = _priceRatios[itemId][zoneGroupId];
-                _priceRatios[itemId][zoneGroupId] = Math.Max(AppConfiguration.Instance.Specialty.MinSpecialtyRatio, initialRatio - ratioDecrease);
+                var minRate = AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+                    ? AppConfiguration.Instance.Specialty.MinSpecialtyRatio
+                    : gameContentManager.GetContentConfig(ContentConfigEnum.MinSpecialtyPriceRatio).Value;
+                _priceRatios[itemId][zoneGroupId] = Math.Max(minRate, initialRatio - ratioDecrease);
             }
         }
     }
@@ -363,9 +392,15 @@ public class SpecialtyManager : Singleton<SpecialtyManager>, ISpecialtyManager
             {
                 InitRatioInZoneForPack(soldPackItems.Key, soldPacksInZone.Key);
                 var initialRatio = _priceRatios[soldPackItems.Key][soldPacksInZone.Key];
-                _priceRatios[soldPackItems.Key][soldPacksInZone.Key] = Math.Min(
-                    AppConfiguration.Instance.Specialty.MaxSpecialtyRatio,
-                    initialRatio + AppConfiguration.Instance.Specialty.RatioIncreasePerTick);
+                var maxRate = AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+                    ? AppConfiguration.Instance.Specialty.MaxSpecialtyRatio
+                    : gameContentManager.GetContentConfig(ContentConfigEnum.MaxSpecialtyPriceRatio).Value;
+                var nextRate = initialRatio;
+                nextRate += AppConfiguration.Instance.Specialty.SpecialtySettingsOverride
+                    ? AppConfiguration.Instance.Specialty.RatioIncreasePerTick
+                    : gameContentManager.GetContentConfig(ContentConfigEnum.RegulateRation).Value / 1000f;
+
+                _priceRatios[soldPackItems.Key][soldPacksInZone.Key] = Math.Min(maxRate,nextRate);
             }
         }
     }
