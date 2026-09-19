@@ -11,6 +11,7 @@ namespace AAEmu.Game.Core.Managers;
 /// </summary>
 public class TimedRewardsManager(ITaskManager taskManager) : Singleton<TimedRewardsManager>, ITimedRewardsManager
 {
+    // TODO: Pull this data from premium_xxx tables and use AppConfiguration.Instance.LaborSettingsOverride
     private const short MaxLabor = 2000;
     private const short MaxLaborPremium = 5000;
 
@@ -19,7 +20,7 @@ public class TimedRewardsManager(ITaskManager taskManager) : Singleton<TimedRewa
         taskManager.Schedule(new TimedRewardsTask(), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
-    public static short GetMaxLabor(bool isPremium)
+    public short GetMaxLabor(bool isPremium)
     {
         return isPremium ? MaxLaborPremium : MaxLabor;
     }
