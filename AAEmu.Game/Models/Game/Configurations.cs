@@ -262,6 +262,10 @@ public class CurrencyValuesConfig
 public class SpecialtyConfig
 {
     /// <summary>
+    /// If set, the values in this config section should be used instead of the values defined in the content_configs table 
+    /// </summary>
+    public bool SpecialtySettingsOverride { get; set; } = false;
+    /// <summary>
     /// Maximum rate for speciality packs
     /// </summary>
     public int MaxSpecialtyRatio { get; set; } = 130;
